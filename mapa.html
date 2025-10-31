@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Mapa do Depósito — Visão Aérea (Leaflet)</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet.draw CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+
+  <style>
+    html,body,#map { height:100%; margin:0; padding:0; }
+    #map { position:fixed; inset:0; }
+    .topright-panel {
+      position: absolute; top: 10px; right: 10px; z-index: 1000;
+      background: rgba(255,255,255,0.9); padding: 8px; border-radius:8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-family: sans-serif;
+    }
+    .btn { display:inline-block; margin:4px; padding:6px 8px; border-radius:6px; cursor:pointer; user-select:none; }
+    .status { position:absolute; left:10px; bottom:10px; z-index:1000; background:rgba(255,255,255,0.9); padding:6px 8px; border-radius:6px; font-family:sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div class="topright-panel" id="controls">
+    <div>
+      <span class="btn" id="zoom10">Visão ~10m</span>
+      <span class="btn" id="zoom20">Visão ~20m</span>
+      <span class="btn" id="follow">Seguir: OFF</span>
+    </div>
+    <div style="margin-top:6px; font-size:13px; color:#333">Centro padrão: Ponta Negra (Manaus)</div>
+  </div>
+
+  <div class="status" id="status">Status: aguardando GPS...</div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet.draw -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+  <script>
+    // -----------------------------
+    // CONFIGURAÇÕES (substitua quando necessário)
+    // -----------------------------
+    // URL do Web App do Google Apps Script (deploy como 'Anyone, even anonymous' ou configurado com OAuth)
+    const APPS_SCRIPT_URL = 'REPLACE_WITH_YOUR_APPS_SCRIPT_WEBAPP_URL';
+
+    // Planilha / aba previstas no Apps Script: 'Pal - Eco TBL' e aba 'MapadoDepósito'
+    // Coordenadas iniciais: Ponta Negra, Manaus (ajuste se preferir)
+    const INITIAL_CENTER = [-3.1190, -60.0217];
+
+    // Polling para sincronização (ms)
+    const SYNC_INTERVAL = 5000; // 5s
+
+    // -----------------------------
+    // Inicializa mapa
+    // -----------------------------
+    const map = L.map('map', { zoomControl:true }).setView(INITIAL_CENTER, 18);
+
+    // Tile layer (OpenStreetMap)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 22,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    // Layer para desenhos carregados/sincronizados
+    const drawingsLayer = L.geoJSON(null, {
+      onEachFeature: function(feature, layer) {
+        if (feature.properties) {
+          let popup = '';
+          if (feature.properties.cte) popup += '<b>CTE:</b> ' + feature.properties.cte + '<br>';
+          if (feature.properties.loc) popup += '<b>Loc:</b> ' + feature.properties.loc + '<br>';
+          if (popup) layer.bindPopup(popup);
+        }
+      }
+    }).addTo(map);
+
+    // FeatureGroup que recebe os desenhos do editor (necessário para Leaflet.draw)
+    const drawnItems = new L.FeatureGroup().addTo(map);
+
+    // Draw control
+    const drawControl = new L.Control.Draw({
+      edit: { featureGroup: drawnItems, remove:true },
+      draw: { circle:false, circlemarker:false }
+    });
+    map.addControl(drawControl);
+
+    // Marker que representa o usuário (ponteiro)
+    const userMarker = L.circleMarker(INITIAL_CENTER, { radius:8 }).addTo(map);
+    userMarker.bindPopup('Você').openPopup();
+    let follow = false;
+
+    // Zoom presets para simular 10m / 20m (ajuste conforme testes)
+    document.getElementById('zoom10').onclick = ()=> map.setZoom(19);
+    document.getElementById('zoom20').onclick = ()=> map.setZoom(17);
+    const followBtn = document.getElementById('follow');
+    followBtn.onclick = ()=> { follow = !follow; followBtn.textContent = 'Seguir: ' + (follow ? 'ON' : 'OFF'); }
+
+    const statusEl = document.getElementById('status');
+
+    // -----------------------------
+    // Geolocalização: acompanhar em tempo real
+    // -----------------------------
+    if ('geolocation' in navigator) {
+      navigator.geolocation.watchPosition(pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        userMarker.setLatLng([lat,lng]);
+        userMarker.bindPopup('Você<br>Lat: ' + lat.toFixed(6) + '<br>Lng: ' + lng.toFixed(6));
+        statusEl.textContent = 'GPS ativo — precisão: ' + (pos.coords.accuracy? pos.coords.accuracy.toFixed(1)+'m':'n/d');
+        if (follow) map.panTo([lat,lng]);
+      }, err => {
+        console.warn('GPS error', err);
+        statusEl.textContent = 'Status: GPS indisponível ou não permitido.';
+      }, { enableHighAccuracy:true, maximumAge:1000, timeout:10000 });
+    } else {
+      statusEl.textContent = 'Status: Geolocalização não suportada pelo navegador.';
+    }
+
+    // -----------------------------
+    // Evento: quando o usuário desenha algo novo
+    // Ao criar: pedimos CTE e Locação; então salvamos via Apps Script
+    // -----------------------------
+    map.on(L.Draw.Event.CREATED, function (e) {
+      const layer = e.layer;
+
+      // Pergunta rápida: CTE e Loc
+      const cte = prompt('Digite o número do CTE (opcional) para associar ao desenho:') || '';
+      const loc = prompt('Digite o número da locação (opcional) para associar ao desenho:') || '';
+
+      // Armazena propriedades no layer
+      layer.feature = layer.feature || { type: 'Feature', properties: {} };
+      layer.feature.properties.cte = cte;
+      layer.feature.properties.loc = loc;
+
+      // Adiciona ao mapa
+      drawnItems.addLayer(layer);
+
+      // Converte para GeoJSON e salva
+      const geo = layer.toGeoJSON();
+      geo.properties = geo.properties || {};
+      geo.properties.cte = cte;
+      geo.properties.loc = loc;
+
+      saveDrawingToSheet(geo);
+    });
+
+    // Quando um desenho é editado
+    map.on('draw:edited', function(e) {
+      const layers = e.layers;
+      layers.eachLayer(layer => {
+        if (!layer.toGeoJSON) return;
+        const geo = layer.toGeoJSON();
+        geo.properties = layer.feature && layer.feature.properties ? layer.feature.properties : {};
+        saveDrawingToSheet(geo, true); // update
+      });
+    });
+
+    // Quando um desenho é removido
+    map.on('draw:deleted', function(e) {
+      const layers = e.layers;
+      layers.eachLayer(layer => {
+        const geo = layer.toGeoJSON();
+        geo.properties = layer.feature && layer.feature.properties ? layer.feature.properties : {};
+        deleteDrawingFromSheet(geo);
+      });
+    });
+
+    // -----------------------------
+    // Funções de sincronização com Google Sheets via Apps Script
+    // APPS_SCRIPT_URL deve apontar para o endpoint do Apps Script que implementa GET/POST/DELETE
+    // Exemplo de payload (POST) para salvar/atualizar:
+    // { action: 'save', geojson: <geojson object>, id: optional }
+    // GET deve retornar um array de objetos {id:, geojson: {}}
+    // -----------------------------
+    async function saveDrawingToSheet(geojson, isUpdate=false) {
+      if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('REPLACE_WITH')) {
+        console.warn('APPS_SCRIPT_URL não configurado — salvando localmente no localStorage');
+        // fallback: salvar no localStorage
+        const stored = JSON.parse(localStorage.getItem('drawings') || '[]');
+        stored.push({ id: Date.now().toString(), geojson });
+        localStorage.setItem('drawings', JSON.stringify(stored));
+        return;
+      }
+
+      try {
+        const resp = await fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json' },
+          body: JSON.stringify({ action:'save', geojson })
+        });
+        const data = await resp.json();
+        console.log('save resp', data);
+      } catch (err) {
+        console.error('Erro ao salvar no Apps Script', err);
+      }
+    }
+
+    async function deleteDrawingFromSheet(geojson) {
+      if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('REPLACE_WITH')) {
+        const stored = JSON.parse(localStorage.getItem('drawings') || '[]');
+        // tentativa simples: remover por igualdade de geometria serializada
+        const serialized = JSON.stringify(geojson.geometry);
+        const filtered = stored.filter(s => JSON.stringify(s.geojson.geometry) !== serialized);
+        localStorage.setItem('drawings', JSON.stringify(filtered));
+        return;
+      }
+
+      try {
+        await fetch(APPS_SCRIPT_URL, {
+          method: 'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ action:'delete', geojson })
+        });
+      } catch (err) { console.error('Erro delete', err); }
+    }
+
+    // Carrega desenhos do servidor (GET)
+    async function loadDrawingsFromSheet() {
+      if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('REPLACE_WITH')) {
+        // fallback: carrega do localStorage
+        const stored = JSON.parse(localStorage.getItem('drawings') || '[]');
+        drawingsLayer.clearLayers();
+        stored.forEach(s => drawingsLayer.addData(s.geojson));
+        return;
+      }
+
+      try {
+        const resp = await fetch(APPS_SCRIPT_URL + '?action=get');
+        const data = await resp.json();
+        drawingsLayer.clearLayers();
+        // data expected: [{id:, geojson: {...}}, ...]
+        data.forEach(item => {
+          const g = item.geojson;
+          // ensure properties
+          g.properties = g.properties || {};
+          drawingsLayer.addData(g);
+        });
+      } catch (err) {
+        console.error('Erro ao carregar desenhos', err);
+      }
+    }
+
+    // Sincronização periódica
+    loadDrawingsFromSheet();
+    setInterval(loadDrawingsFromSheet, SYNC_INTERVAL);
+
+    // -----------------------------
+    // Peça ao usuário para substituir o placeholder do Apps Script
+    // -----------------------------
+    if (APPS_SCRIPT_URL.includes('REPLACE_WITH')) {
+      console.warn('Lembre-se: substitua APPS_SCRIPT_URL pelo URL do seu Apps Script Web App para sincronização com Google Sheets. (Veja o bloco de Apps Script no arquivo)');
+    }
+
+    // -----------------------------
+    // EXEMPLO de Apps Script (Google Apps Script) que você pode implantar como Web App
+    // Cole este código no editor do Apps Script e publique -> Deploy -> Novo deploy -> Web app
+    // - Autorizar / selecionar quem pode acessar: 'Anyone' (ou configure via OAuth conforme necessário)
+    // -----------------------------
+    /*
+    // ---------- Apps Script (Code.gs) ----------
+    function doGet(e) {
+      var action = e.parameter.action || 'get';
+      var ss = SpreadsheetApp.openById('YOUR_SPREADSHEET_ID'); // 'Pal - Eco TBL'
+      var sh = ss.getSheetByName('MapadoDepósito');
+      var rows = sh.getDataRange().getValues();
+      var out = [];
+      // assume: header row: id | timestamp | geojson (string) | cte | loc
+      for (var r=1; r<rows.length; r++) {
+        var id = rows[r][0];
+        var geoStr = rows[r][2];
+        if (!geoStr) continue;
+        try { var geo = JSON.parse(geoStr); out.push({id:id, geojson:geo}); } catch(e){}
+      }
+      return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    function doPost(e) {
+      var body = JSON.parse(e.postData.contents);
+      var action = body.action || 'save';
+      var ss = SpreadsheetApp.openById('YOUR_SPREADSHEET_ID');
+      var sh = ss.getSheetByName('MapadoDepósito');
+      if (action == 'save') {
+        var geo = body.geojson || {};
+        var id = new Date().getTime().toString();
+        var row = [id, new Date().toISOString(), JSON.stringify(geo), geo.properties?geo.properties.cte||'':'', geo.properties?geo.properties.loc||'':''];
+        sh.appendRow(row);
+        return ContentService.createTextOutput(JSON.stringify({status:'ok', id:id})).setMimeType(ContentService.MimeType.JSON);
+      } else if (action == 'delete') {
+        // simple delete by matching serialized geometry
+        var target = JSON.stringify(body.geojson.geometry);
+        var data = sh.getDataRange().getValues();
+        for (var r=1; r<data.length; r++) {
+          try {
+            var g = JSON.parse(data[r][2]);
+            if (JSON.stringify(g.geometry) == target) { sh.deleteRow(r+1); r--; }
+          } catch(e){}
+        }
+        return ContentService.createTextOutput(JSON.stringify({status:'deleted'})).setMimeType(ContentService.MimeType.JSON);
+      }
+      return ContentService.createTextOutput(JSON.stringify({status:'unknown action'})).setMimeType(ContentService.MimeType.JSON);
+    }
+    // -------------------------------------------
+    */
+
+  </script>
+</body>
+</html>
