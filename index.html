@@ -3,222 +3,207 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Conferência de Estoque</title>
-    <script src="https://unpkg.com/html5-qrcode"></script>
+    <title>Coletor de Avarias - Ambev Melhoria</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        body {
-            background-color: #f4f6f9;
-            color: #333;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-
-        h2 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #0078d4; /* Cor padrão SharePoint */
-        }
-
-        /* Estilização da Janela da Câmera */
-        #reader {
-            width: 100%;
-            background: #000;
-            border-radius: 8px;
-            overflow: hidden;
-            margin-bottom: 20px;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-            font-size: 14px;
-        }
-
-        input[type="text"], input[type="number"] {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 16px;
-            background-color: #f9f9f9;
-        }
-
-        input:readonly {
-            background-color: #e9ecef;
-        }
-
-        button {
-            width: 100%;
-            padding: 12px;
-            background-color: #107c41; /* Verde Excel/SharePoint */
-            color: white;
-            border: none;
-            border-radius: 4px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        button:hover {
-            background-color: #0b5930;
-        }
-
-        /* Tabela de Conferência */
-        .table-container {
-            margin-top: 30px;
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-
-        th, td {
-            border: 1px solid #ddd;
-            padding: 10px;
-            text-align: left;
-            font-size: 14px;
-        }
-
-        th {
-            background-color: #f2f2f2;
-            color: #333;
-        }
-
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f5f7; color: #333; }
+        h2 { color: #0078d4; }
+        #camera { width: 100%; max-width: 500px; height: 350px; border: 3px solid #0078d4; margin-bottom: 10px; background-color: #000; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #0078d4; color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .btn { padding: 12px 20px; background-color: #0078d4; color: white; border: none; cursor: pointer; font-size: 16px; margin-top: 10px; font-weight: bold; border-radius: 4px; margin-right: 10px; }
+        .btn:hover { background-color: #005a9e; }
+        .btn-enviar { background-color: #107c41; }
+        .btn-enviar:hover { background-color: #0b5930; }
+        .status-container { margin-top: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>Leitor & Conferência</h2>
+    <h2>Coletor de Controle de Avarias - Ambev</h2>
+    
+    <div id="camera"></div>
+    
+    <button class="btn" onclick="iniciarCamera()">Ligar Câmera</button>
+    <button class="btn btn-enviar" onclick="enviarParaSharePoint()">Enviar para o SharePoint</button>
 
-    <div id="reader"></div>
+    <div id="statusLeitura" class="status-container"></div>
 
-    <div class="form-group">
-        <label for="ean">Código EAN (Lido):</label>
-        <input type="text" id="ean" placeholder="Aguardando leitura..." readonly>
-    </div>
+    <h3>Itens Conferidos (Prontos para Registrar na Lista ControleAvarias)</h3>
+    <table id="tabelaConferidos">
+        <thead>
+            <tr>
+                <th>EAN</th>
+                <th>Código Interno</th>
+                <th>Descrição</th>
+                <th>Quantidade</th>
+            </tr>
+        </thead>
+        <tbody>
+            </tbody>
+    </table>
 
-    <div class="form-group">
-        <label for="codigo">Código Interno:</label>
-        <input type="text" id="codigo" placeholder="Buscando no sistema..." readonly>
-    </div>
+    <script>
+        // ==========================================================
+        // CONFIGURAÇÕES CONFIGURADAS DO SHAREPOINT (AMBEV)
+        // ==========================================================
+        const SHAREPOINT_CONFIG = {
+            // URL base do site extraída do seu link oficial
+            siteUrl: "https://anheuserbuschinbev.sharepoint.com/sites/Melhoria", 
+            
+            // Lista onde serão gravadas as avarias encontradas
+            listName: "ControleAvarias", 
+            
+            // Mapeamento das colunas idênticas às da sua foto
+            colunas: {
+                ean: "EAN",
+                codigo: "CodigoInterno",
+                descricao: "Descricao",
+                quantidade: "Quantidade"
+            }
+        };
 
-    <div class="form-group">
-        <label for="descricao">Descrição do Produto:</label>
-        <input type="text" id="descricao" placeholder="Buscando no sistema..." readonly>
-    </div>
+        // BANCO DE DADOS LOCAL (Simulando a sua lista CadastroItens)
+        // Insira aqui os códigos reais para teste na mesma estrutura
+        const bancoCadastroProdutos = {
+            "38788": { codigo: "1743", descricao: "ANTARCTICA PILSEN GFA VD 1L C/TTC" },
+            "38853": { codigo: "2132", descricao: "GUARANA CHP ANTARCTICA PET1L CX C/6 NRIO" },
+            "38870": { codigo: "2357", descricao: "BARE GUARANA PET 2L CAIXA C/6" },
+            "38883": { codigo: "2546", descricao: "ORIGINAL 600ML" },
+            "37819": { codigo: "7977", descricao: "GATORADE UVA PET 500ML SIX PACK" },
+            "38992": { codigo: "9068", descricao: "SKOL LATA 350ML SH C/12 NPAL" }
+        };
 
-    <div class="form-group">
-        <label for="qtd">Quantidade:</label>
-        <input type="number" id="qtd" value="1" min="1">
-    </div>
+        // Ativa o leitor de código de barras pela câmera
+        function iniciarCamera() {
+            document.getElementById('statusLeitura').innerText = "Iniciando câmera...";
+            
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.querySelector('#camera'),
+                    constraints: {
+                        facingMode: "environment" // Força o uso da câmera traseira do smartphone
+                    },
+                },
+                decoder: {
+                    readers: ["ean_reader", "code_128_reader", "code_39_reader"] // Formatos comuns de Ambev/Logística
+                }
+            }, function(err) {
+                if (err) {
+                    console.error("Erro na câmera:", err);
+                    document.getElementById('statusLeitura').innerText = "Erro ao carregar a câmera.";
+                    alert("Atenção: A câmera só ligará se o arquivo rodar em ambiente HTTPS (dentro do próprio SharePoint) ou em servidor local (http://localhost).");
+                    return;
+                }
+                Quagga.start();
+                document.getElementById('statusLeitura').innerText = "Câmera Pronta! Aponte para o código.";
+            });
 
-    <button id="btnInserir">Inserir na Conferência</button>
-
-    <div class="table-container">
-        <h3>Produtos Conferidos</h3>
-        <table id="tabelaConferidos">
-            <thead>
-                <tr>
-                    <th>EAN</th>
-                    <th>Código</th>
-                    <th>Descrição</th>
-                    <th>Qtd</th>
-                </tr>
-            </thead>
-            <tbody>
-                </tbody>
-        </table>
-    </div>
-</div>
-
-<script>
-    // 1. Inicializa o leitor de código de barras
-    const html5QrcodeScanner = new Html5QrcodeScanner(
-        "reader", 
-        { 
-            fps: 10, 
-            qrbox: { width: 250, height: 150 }, // Formato retangular ideal para código de barras
-            rememberLastUsedCamera: true,
-            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+            // Ação ao detectar um código com sucesso
+            Quagga.onDetected(function(result) {
+                const codigoLido = result.codeResult.code;
+                
+                // Emite um aviso visual na tela
+                document.getElementById('statusLeitura').innerText = `Código lido: ${codigoLido}`;
+                
+                adicionarItemALista(codigoLido);
+                
+                // Pausa o leitor por 2 segundos para evitar duplicar o mesmo item instantaneamente
+                Quagga.stop();
+                setTimeout(() => { 
+                    Quagga.start(); 
+                    document.getElementById('statusLeitura').innerText = "Pronto para a próxima leitura.";
+                }, 2000); 
+            });
         }
-    );
 
-    // Função que roda quando um código é lido com sucesso
-    function onScanSuccess(decodedText, decodedResult) {
-        document.getElementById('ean').value = decodedText;
-        
-        // Simulação de busca (Estático por enquanto, até linkarmos o SharePoint)
-        document.getElementById('codigo').value = "PROD-" + decodedText.substring(0, 4);
-        document.getElementById('descricao').value = "Produto Simulado " + decodedText;
-        
-        // Emite um bipe sonoro leve para o usuário saber que leu (opcional)
-        if (window.navigator.vibrate) window.navigator.vibrate(100);
-    }
+        // Insere o produto capturado na tabela da página
+        function adicionarItemALista(ean) {
+            const eanLimpo = ean.trim(); 
+            
+            // Busca o item no cadastro fictício (isso será integrado ao SharePoint futuramente se quiser)
+            const produto = bancoCadastroProdutos[eanLimpo] || { codigo: "N/A", descricao: "Produto não cadastrado" };
+            const tabelaBody = document.querySelector('#tabelaConferidos tbody');
 
-    html5QrcodeScanner.render(onScanSuccess);
+            const novaLinha = document.createElement('tr');
+            novaLinha.innerHTML = `
+                <td>${eanLimpo}</td>
+                <td>${produto.codigo}</td>
+                <td>${produto.descricao}</td>
+                <td>1</td> `;
 
-    // 2. Lógica para inserir os dados lidos na tabela temporária de conferência
-    document.getElementById('btnInserir').addEventListener('click', function() {
-        const ean = document.getElementById('ean').value;
-        const codigo = document.getElementById('codigo').value;
-        const descricao = document.getElementById('descricao').value;
-        const qtd = document.getElementById('qtd').value;
-
-        if (!ean) {
-            alert("Por favor, faça a leitura de um código de barras primeiro!");
-            return;
+            tabelaBody.appendChild(novaLinha);
         }
 
-        // Cria a nova linha na tabela visual
-        const tbody = document.querySelector('#tabelaConferidos tbody');
-        const novaLinha = document.createElement('tr');
+        // Faz o envio em lote de todas as linhas coletadas para o SharePoint
+        async function enviarParaSharePoint() {
+            const linhas = document.querySelectorAll('#tabelaConferidos tbody tr');
+            
+            if (linhas.length === 0) {
+                alert("Não existem itens na tabela para enviar!");
+                return;
+            }
 
-        novaLinha.innerHTML = `
-            <td>${ean}</td>
-            <td>${codigo}</td>
-            <td>${descricao}</td>
-            <td>${qtd}</td>
-        `;
+            let formDigest = "";
+            // Faz o handshake de segurança obrigatório com a API do SharePoint da Ambev
+            try {
+                const responseContext = await fetch(`${SHAREPOINT_CONFIG.siteUrl}/_api/contextinfo`, {
+                    method: "POST",
+                    headers: { "Accept": "application/json;odata=verbose" }
+                });
+                const dataContext = await responseContext.json();
+                formDigest = dataContext.d.GetContextWebInformation.FormDigestValue;
+            } catch (e) {
+                console.warn("Aviso: Token de autenticação não gerado automaticamente. Certifique-se de que está logado na conta Ambev no navegador.");
+            }
 
-        tbody.appendChild(novaLinha);
+            // Processa linha por linha da tabela
+            for (const linha of linhas) {
+                const ean = linha.cells[0].textContent;
+                const codigo = linha.cells[1].textContent;
+                const descricao = linha.cells[2].textContent;
+                const quantidade = linha.cells[3].textContent;
 
-        // Limpa os campos para a próxima leitura
-        document.getElementById('ean').value = "";
-        document.getElementById('codigo').value = "";
-        document.getElementById('descricao').value = "";
-        document.getElementById('qtd').value = "1";
-    });
-</script>
+                // Montagem exata do JSON esperado pelo SharePoint REST API
+                const itemData = {
+                    "__metadata": { "type": `SP.Data.${SHAREPOINT_CONFIG.listName}ListItem` },
+                    [SHAREPOINT_CONFIG.colunas.ean]: ean,
+                    [SHAREPOINT_CONFIG.colunas.codigo]: codigo,
+                    [SHAREPOINT_CONFIG.colunas.descricao]: descricao,
+                    [SHAREPOINT_CONFIG.colunas.quantidade]: parseInt(quantidade) // Transforma em número inteiro
+                };
 
+                try {
+                    const urlDestino = `${SHAREPOINT_CONFIG.siteUrl}/_api/web/lists/getbytitle('${SHAREPOINT_CONFIG.listName}')/items`;
+                    
+                    const response = await fetch(urlDestino, {
+                        method: "POST",
+                        headers: {
+                            "Accept": "application/json;odata=verbose",
+                            "Content-Type": "application/json;odata=verbose",
+                            "X-RequestDigest": formDigest
+                        },
+                        body: JSON.stringify(itemData)
+                    });
+
+                    if (response.ok) {
+                        linha.style.backgroundColor = "#d4edda"; // Linha fica verde se salvou no SharePoint
+                    } else {
+                        linha.style.backgroundColor = "#f8d7da"; // Linha fica vermelha se falhou
+                        const erroTexto = await response.text();
+                        console.error("Falha no SharePoint:", erroTexto);
+                    }
+                } catch (error) {
+                    console.error("Erro de conexão na API:", error);
+                    linha.style.backgroundColor = "#f8d7da";
+                }
+            }
+            alert("Operação finalizada! Itens verdes foram gravados no SharePoint com sucesso.");
+        }
+    </script>
 </body>
 </html>
-
-
