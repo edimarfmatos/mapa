@@ -3,193 +3,222 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coletor de Avarias</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <title>Conferência de Estoque</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        #camera { width: 100%; max-width: 500px; height: 350px; border: 2px solid #ccc; margin-bottom: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .btn { padding: 10px 20px; background-color: #0078d4; color: white; border: none; cursor: pointer; font-size: 16px; margin-top: 10px; }
-        .btn:hover { background-color: #005a9e; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f4f6f9;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #0078d4; /* Cor padrão SharePoint */
+        }
+
+        /* Estilização da Janela da Câmera */
+        #reader {
+            width: 100%;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+            background-color: #f9f9f9;
+        }
+
+        input:readonly {
+            background-color: #e9ecef;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #107c41; /* Verde Excel/SharePoint */
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background-color: #0b5930;
+        }
+
+        /* Tabela de Conferência */
+        .table-container {
+            margin-top: 30px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            color: #333;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
     </style>
 </head>
 <body>
 
-    <h2>Coletor de Controle de Avarias</h2>
-    
-    <div id="camera"></div>
-    
-    <button class="btn" onclick="iniciarCamera()">Ligar Câmera</button>
-    <button class="btn" style="background-color: #107c41;" onclick="enviarParaSharePoint()">Enviar para o SharePoint</button>
+<div class="container">
+    <h2>Leitor & Conferência</h2>
 
-    <h3>Itens Conferidos</h3>
-    <table id="tabelaConferidos">
-        <thead>
-            <tr>
-                <th>EAN</th>
-                <th>Código Interno</th>
-                <th>Descrição</th>
-                <th>Quantidade</th>
-            </tr>
-        </thead>
-        <tbody>
-            </tbody>
-    </table>
+    <div id="reader"></div>
 
-    <script>
-        // ==========================================
-        // CONFIGURAÇÕES DO SHAREPOINT (AJUSTE AQUI)
-        // ==========================================
-        const SHAREPOINT_CONFIG = {
-            // ⚠️ COLE O LINK DO SEU SITE DO SHAREPOINT AQUI (Sem a parte de "Lists/...")
-            siteUrl: "https://anheuserbuschinbev.sharepoint.com/sites/Melhoria", 
-            
-            // ⚠️ O NOME DA SUA LISTA DE DESTINO
-            listName: "CadastroItens", 
-            
-            // Nomes internos das colunas no SharePoint
-            colunas: {
-                ean: "EAN",
-                codigo: "CodigoInterno",
-                descricao: "Descricao",
-                quantidade: "Quantidade"
-            }
-        };
+    <div class="form-group">
+        <label for="ean">Código EAN (Lido):</label>
+        <input type="text" id="ean" placeholder="Aguardando leitura..." readonly>
+    </div>
 
-        // Banco de dados simulado (Lista "Cadastro Produtos")
-        // Como você mencionou, aqui estaria a sua base que o app consulta ao ler o EAN
-        const bancoCadastroProdutos = {
-            "7891234567890": { codigo: "1001", descricao: "Produto Exemplo A" },
-            "7890123456789": { codigo: "1002", descricao: "Produto Exemplo B" }
-        };
+    <div class="form-group">
+        <label for="codigo">Código Interno:</label>
+        <input type="text" id="codigo" placeholder="Buscando no sistema..." readonly>
+    </div>
 
-        // Inicializa o QuaggaJS para leitura contínua
-        function iniciarCamera() {
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.querySelector('#camera'),
-                    constraints: {
-                        facingMode: "environment" // Usa a câmera traseira do celular
-                    },
-                },
-                decoder: {
-                    readers: ["ean_reader", "ean_8_reader"] // Tipos de código de barras
-                }
-            }, function(err) {
-                if (err) {
-                    console.error("Erro ao iniciar câmera:", err);
-                    alert("Erro ao abrir a câmera. Certifique-se de que está usando HTTPS.");
-                    return;
-                }
-                Quagga.start();
-            });
+    <div class="form-group">
+        <label for="descricao">Descrição do Produto:</label>
+        <input type="text" id="descricao" placeholder="Buscando no sistema..." readonly>
+    </div>
 
-            // Evento disparado a cada leitura com sucesso
-            Quagga.onDetected(function(result) {
-                const codigoEAN = result.codeResult.code;
-                adicionarItemAALista(codigoEAN);
-                
-                // Pausa breve para não ler o mesmo código 50 vezes no mesmo segundo
-                Quagga.stop();
-                setTimeout(() => { Quagga.start(); }, 1500); 
-            });
+    <div class="form-group">
+        <label for="qtd">Quantidade:</label>
+        <input type="number" id="qtd" value="1" min="1">
+    </div>
+
+    <button id="btnInserir">Inserir na Conferência</button>
+
+    <div class="table-container">
+        <h3>Produtos Conferidos</h3>
+        <table id="tabelaConferidos">
+            <thead>
+                <tr>
+                    <th>EAN</th>
+                    <th>Código</th>
+                    <th>Descrição</th>
+                    <th>Qtd</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // 1. Inicializa o leitor de código de barras
+    const html5QrcodeScanner = new Html5QrcodeScanner(
+        "reader", 
+        { 
+            fps: 10, 
+            qrbox: { width: 250, height: 150 }, // Formato retangular ideal para código de barras
+            rememberLastUsedCamera: true,
+            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+        }
+    );
+
+    // Função que roda quando um código é lido com sucesso
+    function onScanSuccess(decodedText, decodedResult) {
+        document.getElementById('ean').value = decodedText;
+        
+        // Simulação de busca (Estático por enquanto, até linkarmos o SharePoint)
+        document.getElementById('codigo').value = "PROD-" + decodedText.substring(0, 4);
+        document.getElementById('descricao').value = "Produto Simulado " + decodedText;
+        
+        // Emite um bipe sonoro leve para o usuário saber que leu (opcional)
+        if (window.navigator.vibrate) window.navigator.vibrate(100);
+    }
+
+    html5QrcodeScanner.render(onScanSuccess);
+
+    // 2. Lógica para inserir os dados lidos na tabela temporária de conferência
+    document.getElementById('btnInserir').addEventListener('click', function() {
+        const ean = document.getElementById('ean').value;
+        const codigo = document.getElementById('codigo').value;
+        const descricao = document.getElementById('descricao').value;
+        const qtd = document.getElementById('qtd').value;
+
+        if (!ean) {
+            alert("Por favor, faça a leitura de um código de barras primeiro!");
+            return;
         }
 
-        // Adiciona o produto na tabela temporária da tela
-        function adicionarItemAALista(ean) {
-            const produto = bancoCadastroProdutos[ean] || { codigo: "N/A", descricao: "Produto não cadastrado" };
-            const tabelaBody = document.querySelector('#tabelaConferidos tbody');
+        // Cria a nova linha na tabela visual
+        const tbody = document.querySelector('#tabelaConferidos tbody');
+        const novaLinha = document.createElement('tr');
 
-            // Cria uma nova linha na tabela
-            const novaLinha = document.createElement('tr');
-            novaLinha.innerHTML = `
-                <td>${ean}</td>
-                <td>${produto.codigo}</td>
-                <td>${produto.descricao}</td>
-                <td>1</td> `;
+        novaLinha.innerHTML = `
+            <td>${ean}</td>
+            <td>${codigo}</td>
+            <td>${descricao}</td>
+            <td>${qtd}</td>
+        `;
 
-            tabelaBody.appendChild(novaLinha);
-        }
+        tbody.appendChild(novaLinha);
 
-        // Envia todos os itens da tabela para o SharePoint (Múltiplas digitações)
-        async function enviarParaSharePoint() {
-            const linhas = document.querySelectorAll('#tabelaConferidos tbody tr');
-            
-            if (linhas.length === 0) {
-                alert("Nenhum item na lista para enviar!");
-                return;
-            }
+        // Limpa os campos para a próxima leitura
+        document.getElementById('ean').value = "";
+        document.getElementById('codigo').value = "";
+        document.getElementById('descricao').value = "";
+        document.getElementById('qtd').value = "1";
+    });
+</script>
 
-            // Busca o Context Token necessário para autenticação no SharePoint (Necessário se rodar dentro do ecossistema SP)
-            let formDigest = "";
-            const digestElement = document.getElementById("__REQUESTDIGEST");
-            if (digestElement) {
-                formDigest = digestElement.value;
-            } else {
-                // Se rodar fora, tenta buscar via API do SharePoint
-                try {
-                    const responseContext = await fetch(`${SHAREPOINT_CONFIG.siteUrl}/_api/contextinfo`, {
-                        method: "POST",
-                        headers: { "Accept": "application/json;odata=verbose" }
-                    });
-                    const dataContext = await responseContext.json();
-                    formDigest = dataContext.d.GetContextWebInformation.FormDigestValue;
-                } catch (e) {
-                    console.warn("Não foi possível obter o __REQUESTDIGEST automaticamente. Certifique-se de estar logado no SharePoint.");
-                }
-            }
-
-            // Loop para enviar item por item (Linha por linha)
-            for (const linha of linhas) {
-                const ean = linha.cells[0].textContent;
-                const codigo = linha.cells[1].textContent;
-                const descricao = linha.cells[2].textContent;
-                const quantidade = linha.cells[3].textContent; // Sempre será 1
-
-                // Monta o payload do SharePoint
-                const itemData = {
-                    "__metadata": { "type": `SP.Data.${SHAREPOINT_CONFIG.listName.replace(/\s/g, "")}ListItem` },
-                    [SHAREPOINT_CONFIG.colunas.ean]: ean,
-                    [SHAREPOINT_CONFIG.colunas.codigo]: codigo,
-                    [SHAREPOINT_CONFIG.colunas.descricao]: descricao,
-                    [SHAREPOINT_CONFIG.colunas.quantidade]: parseInt(quantidade)
-                };
-
-                try {
-                    const urlDestino = `${SHAREPOINT_CONFIG.siteUrl}/_api/web/lists/getbytitle('${SHAREPOINT_CONFIG.listName}')/items`;
-                    
-                    const response = await fetch(urlDestino, {
-                        method: "POST",
-                        headers: {
-                            "Accept": "application/json;odata=verbose",
-                            "Content-Type": "application/json;odata=verbose",
-                            "X-RequestDigest": formDigest
-                        },
-                        body: JSON.stringify(itemData)
-                    });
-
-                    if (response.ok) {
-                        console.log(`Produto ${codigo} enviado com sucesso!`);
-                        linha.style.backgroundColor = "#d4edda"; // Pinta a linha de verde se deu certo
-                    } else {
-                        console.error(`Erro ao enviar o item ${codigo}`);
-                        linha.style.backgroundColor = "#f8d7da"; // Pinta de vermelho se falhou
-                    }
-                } catch (error) {
-                    console.error("Erro na requisição REST:", error);
-                    linha.style.backgroundColor = "#f8d7da";
-                }
-            }
-
-            alert("Processo de envio finalizado! Verifique o status (Verde = Sucesso / Vermelho = Erro) na tabela.");
-        }
-    </script>
 </body>
 </html>
-
 
 
