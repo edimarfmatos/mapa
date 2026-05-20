@@ -42,21 +42,17 @@
             </tr>
         </thead>
         <tbody>
-            </tbody>
+        </tbody>
     </table>
 
     <script>
         // ==========================================================
-        // CONFIGURAÇÕES CONFIGURADAS DO SHAREPOINT (AMBEV)
+        // CONFIGURAÇÕES DO SHAREPOINT (AMBEV)
         // ==========================================================
         const SHAREPOINT_CONFIG = {
-            // URL base do site extraída do seu link oficial
             siteUrl: "https://anheuserbuschinbev.sharepoint.com/sites/Melhoria", 
-            
-            // Lista onde serão gravadas as avarias encontradas
             listName: "ContAvaria", 
-            
-            // Mapeamento das colunas idênticas às da sua foto
+            // IMPORTANTE: Certifique-se de que estes são os nomes INTERNOS das colunas no SharePoint
             colunas: {
                 ean: "EAN",
                 codigo: "codigo",
@@ -65,9 +61,9 @@
             }
         };
 
-        // BANCO DE DADOS LOCAL (Simulando a sua lista CadastroItens)
-        // Insira aqui os códigos reais para teste na mesma estrutura
+        // BANCO DE DADOS LOCAL (Exemplo com o óleo bifásico e produtos Ambev)
         const bancoCadastroProdutos = {
+            "7891172274457": { codigo: "9999", descricao: "OLEO BIFASICO NATURA TODODIA CEREJA E AVELA 120ML" }, // Exemplo do bipo anterior
             "7908371602560": { codigo: "1743", descricao: "ANTARCTICA PILSEN GFA VD 1L C/TTC" },
             "38853": { codigo: "2132", descricao: "GUARANA CHP ANTARCTICA PET1L CX C/6 NRIO" },
             "38870": { codigo: "2357", descricao: "BARE GUARANA PET 2L CAIXA C/6" },
@@ -76,7 +72,6 @@
             "38992": { codigo: "9068", descricao: "SKOL LATA 350ML SH C/12 NPAL" }
         };
 
-        // Ativa o leitor de código de barras pela câmera
         function iniciarCamera() {
             document.getElementById('statusLeitura').innerText = "Iniciando câmera...";
             
@@ -85,34 +80,27 @@
                     name: "Live",
                     type: "LiveStream",
                     target: document.querySelector('#camera'),
-                    constraints: {
-                        facingMode: "environment" // Força o uso da câmera traseira do smartphone
-                    },
+                    constraints: { facingMode: "environment" },
                 },
                 decoder: {
-                    readers: ["ean_reader", "code_128_reader", "code_39_reader"] // Formatos comuns de Ambev/Logística
+                    readers: ["ean_reader", "code_128_reader", "code_39_reader"]
                 }
             }, function(err) {
                 if (err) {
                     console.error("Erro na câmera:", err);
                     document.getElementById('statusLeitura').innerText = "Erro ao carregar a câmera.";
-                    alert("Atenção: A câmera só ligará se o arquivo rodar em ambiente HTTPS (dentro do próprio SharePoint) ou em servidor local (http://localhost).");
+                    alert("Atenção: A câmera exige ambiente HTTPS ou execução dentro do SharePoint.");
                     return;
                 }
                 Quagga.start();
                 document.getElementById('statusLeitura').innerText = "Câmera Pronta! Aponte para o código.";
             });
 
-            // Ação ao detectar um código com sucesso
             Quagga.onDetected(function(result) {
                 const codigoLido = result.codeResult.code;
-                
-                // Emite um aviso visual na tela
                 document.getElementById('statusLeitura').innerText = `Código lido: ${codigoLido}`;
-                
                 adicionarItemALista(codigoLido);
                 
-                // Pausa o leitor por 2 segundos para evitar duplicar o mesmo item instantaneamente
                 Quagga.stop();
                 setTimeout(() => { 
                     Quagga.start(); 
@@ -121,11 +109,8 @@
             });
         }
 
-        // Insere o produto capturado na tabela da página
         function adicionarItemALista(ean) {
             const eanLimpo = ean.trim(); 
-            
-            // Busca o item no cadastro fictício (isso será integrado ao SharePoint futuramente se quiser)
             const produto = bancoCadastroProdutos[eanLimpo] || { codigo: "N/A", descricao: "Produto não cadastrado" };
             const tabelaBody = document.querySelector('#tabelaConferidos tbody');
 
@@ -134,53 +119,63 @@
                 <td>${eanLimpo}</td>
                 <td>${produto.codigo}</td>
                 <td>${produto.descricao}</td>
-                <td>1</td> `;
+                <td>1</td>`;
 
             tabelaBody.appendChild(novaLinha);
         }
 
-        // Faz o envio em lote de todas as linhas coletadas para o SharePoint
+        // FUNÇÃO DE ENVIO CORRIGIDA E ADAPTADA
         async function enviarParaSharePoint() {
-            const linhas = document.querySelectorAll('#tabelaConferidos tbody tr');
+            const rows = document.querySelectorAll('#tabelaConferidos tbody tr');
             
-            if (linhas.length === 0) {
+            if (rows.length === 0) {
                 alert("Não existem itens na tabela para enviar!");
                 return;
             }
 
+            document.getElementById('statusLeitura').innerText = "Solicitando token de segurança do SharePoint...";
             let formDigest = "";
-            // Faz o handshake de segurança obrigatório com a API do SharePoint da Ambev
+
+            // 1. Busca o Token de Validação da Requisição (FormDigest)
             try {
-                const responseContext = await fetch(`${SHAREPOINT_CONFIG.siteUrl}/_api/contextinfo`, {
+                const contextResponse = await fetch(`${SHAREPOINT_CONFIG.siteUrl}/_api/contextinfo`, {
                     method: "POST",
                     headers: { "Accept": "application/json;odata=verbose" }
                 });
-                const dataContext = await responseContext.json();
-                formDigest = dataContext.d.GetContextWebInformation.FormDigestValue;
+                
+                if (!contextResponse.ok) throw new Error("Falha ao obter o Context Info do SharePoint.");
+                
+                const contextData = await contextResponse.json();
+                formDigest = contextData.d.GetContextWebInformation.FormDigestValue;
             } catch (e) {
-                console.warn("Aviso: Token de autenticação não gerado automaticamente. Certifique-se de que está logado na conta Ambev no navegador.");
+                console.error(e);
+                alert("Erro crítico: Não foi possível autenticar no SharePoint. Certifique-se de que este arquivo HTML está rodando de dentro do ambiente do SharePoint da Ambev.");
+                document.getElementById('statusLeitura').innerText = "Erro de autenticação.";
+                return;
             }
 
-            // Processa linha por linha da tabela
-            for (const linha of linhas) {
-                const ean = linha.cells[0].textContent;
-                const codigo = linha.cells[1].textContent;
-                const descricao = linha.cells[2].textContent;
-                const quantidade = linha.cells[3].textContent;
+            document.getElementById('statusLeitura').innerText = "Enviando itens para a lista...";
 
-                // Montagem exata do JSON esperado pelo SharePoint REST API
+            // 2. Processa e envia item por item
+            for (const row of rows) {
+                const ean = row.cells[0].textContent;
+                const codigo = row.cells[1].textContent;
+                const descricao = row.cells[2].textContent;
+                const quantidade = row.cells[3].textContent;
+
+                // Montagem do payload aceito pelo REST API do SharePoint
                 const itemData = {
                     "__metadata": { "type": `SP.Data.${SHAREPOINT_CONFIG.listName}ListItem` },
                     [SHAREPOINT_CONFIG.colunas.ean]: ean,
                     [SHAREPOINT_CONFIG.colunas.codigo]: codigo,
                     [SHAREPOINT_CONFIG.colunas.descricao]: descricao,
-                    [SHAREPOINT_CONFIG.colunas.quantidade]: parseInt(quantidade) // Transforma em número inteiro
+                    [SHAREPOINT_CONFIG.colunas.quantidade]: parseInt(quantidade)
                 };
 
                 try {
-                    const urlDestino = `${SHAREPOINT_CONFIG.siteUrl}/_api/web/lists/getbytitle('${SHAREPOINT_CONFIG.listName}')/items`;
+                    const endpoint = `${SHAREPOINT_CONFIG.siteUrl}/_api/web/lists/getbytitle('${SHAREPOINT_CONFIG.listName}')/items`;
                     
-                    const response = await fetch(urlDestino, {
+                    const response = await fetch(endpoint, {
                         method: "POST",
                         headers: {
                             "Accept": "application/json;odata=verbose",
@@ -191,18 +186,20 @@
                     });
 
                     if (response.ok) {
-                        linha.style.backgroundColor = "#d4edda"; // Linha fica verde se salvou no SharePoint
+                        row.style.backgroundColor = "#d4edda"; // Verde para sucesso
                     } else {
-                        linha.style.backgroundColor = "#f8d7da"; // Linha fica vermelha se falhou
-                        const erroTexto = await response.text();
-                        console.error("Falha no SharePoint:", erroTexto);
+                        row.style.backgroundColor = "#f8d7da"; // Vermelho para erro
+                        const errorDetails = await response.text();
+                        console.error("Erro retornado pelo SharePoint:", errorDetails);
                     }
                 } catch (error) {
-                    console.error("Erro de conexão na API:", error);
-                    linha.style.backgroundColor = "#f8d7da";
+                    console.error("Erro na comunicação com a API:", error);
+                    row.style.backgroundColor = "#f8d7da";
                 }
             }
-            alert("Operação finalizada! Itens verdes foram gravados no SharePoint com sucesso.");
+            
+            document.getElementById('statusLeitura').innerText = "Envio concluído.";
+            alert("Processo finalizado. Verifique as linhas verdes na tabela.");
         }
     </script>
 </body>
