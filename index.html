@@ -1,206 +1,188 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coletor de Avarias - Ambev Melhoria</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f5f7; color: #333; }
-        h2 { color: #0078d4; }
-        #camera { width: 100%; max-width: 500px; height: 350px; border: 3px solid #0078d4; margin-bottom: 10px; background-color: #000; border-radius: 4px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background-color: #0078d4; color: white; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
-        .btn { padding: 12px 20px; background-color: #0078d4; color: white; border: none; cursor: pointer; font-size: 16px; margin-top: 10px; font-weight: bold; border-radius: 4px; margin-right: 10px; }
-        .btn:hover { background-color: #005a9e; }
-        .btn-enviar { background-color: #107c41; }
-        .btn-enviar:hover { background-color: #0b5930; }
-        .status-container { margin-top: 10px; font-weight: bold; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coletor de Avarias</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+
+<style>
+body { font-family: Arial; margin: 15px; background:#f4f5f7;}
+#camera { width:100%; height:300px; background:#000; border:3px solid #0078d4;}
+.btn { padding:12px; margin:5px; font-weight:bold; border:none; cursor:pointer;}
+.btn-blue {background:#0078d4;color:#fff;}
+.btn-green {background:#107c41;color:#fff;}
+table {width:100%; margin-top:10px; background:#fff;}
+td,th{padding:10px;border:1px solid #ddd;}
+</style>
 </head>
+
 <body>
 
-    <h2>Coletor de Controle de Avarias - Ambev</h2>
-    
-    <div id="camera"></div>
-    
-    <button class="btn" onclick="iniciarCamera()">Ligar Câmera</button>
-    <button class="btn btn-enviar" onclick="enviarParaSharePoint()">Enviar para o SharePoint</button>
+<h2>Coletor de Avarias</h2>
 
-    <div id="statusLeitura" class="status-container"></div>
+<div id="camera"></div>
 
-    <h3>Itens Conferidos (Prontos para Registrar na Lista ControleAvarias)</h3>
-    <table id="tabelaConferidos">
-        <thead>
-            <tr>
-                <th>EAN</th>
-                <th>Código Interno</th>
-                <th>Descrição</th>
-                <th>Quantidade</th>
-            </tr>
-        </thead>
-        <tbody>
-        </tbody>
-    </table>
+<button class="btn btn-blue" onclick="iniciarCamera()">Ligar câmera</button>
+<button class="btn btn-green" onclick="enviar()">Enviar</button>
+<button class="btn" onclick="limpar()">Limpar</button>
 
-    <script>
-        // ==========================================================
-        // CONFIGURAÇÕES DO SHAREPOINT (AMBEV)
-        // ==========================================================
-        const SHAREPOINT_CONFIG = {
-            siteUrl: "https://anheuserbuschinbev.sharepoint.com/sites/Melhoria", 
-            listName: "ContAvaria", 
-            // IMPORTANTE: Certifique-se de que estes são os nomes INTERNOS das colunas no SharePoint
-            colunas: {
-                ean: "EAN",
-                codigo: "codigo",
-                descricao: "descricao",
-                quantidade: "und"
-            }
-        };
+<div id="status"></div>
 
-        // BANCO DE DADOS LOCAL (Exemplo com o óleo bifásico e produtos Ambev)
-        const bancoCadastroProdutos = {
-            "7891172274457": { codigo: "9999", descricao: "OLEO BIFASICO NATURA TODODIA CEREJA E AVELA 120ML" }, // Exemplo do bipo anterior
-            "7908371602560": { codigo: "1743", descricao: "ANTARCTICA PILSEN GFA VD 1L C/TTC" },
-            "38853": { codigo: "2132", descricao: "GUARANA CHP ANTARCTICA PET1L CX C/6 NRIO" },
-            "38870": { codigo: "2357", descricao: "BARE GUARANA PET 2L CAIXA C/6" },
-            "38883": { codigo: "2546", descricao: "ORIGINAL 600ML" },
-            "37819": { codigo: "7977", descricao: "GATORADE UVA PET 500ML SIX PACK" },
-            "38992": { codigo: "9068", descricao: "SKOL LATA 350ML SH C/12 NPAL" }
-        };
+<table>
+<thead>
+<tr>
+<th>EAN</th>
+<th>Código</th>
+<th>Descrição</th>
+<th>Qtd</th>
+</tr>
+</thead>
+<tbody id="lista"></tbody>
+</table>
 
-        function iniciarCamera() {
-            document.getElementById('statusLeitura').innerText = "Iniciando câmera...";
-            
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.querySelector('#camera'),
-                    constraints: { facingMode: "environment" },
-                },
-                decoder: {
-                    readers: ["ean_reader", "code_128_reader", "code_39_reader"]
-                }
-            }, function(err) {
-                if (err) {
-                    console.error("Erro na câmera:", err);
-                    document.getElementById('statusLeitura').innerText = "Erro ao carregar a câmera.";
-                    alert("Atenção: A câmera exige ambiente HTTPS ou execução dentro do SharePoint.");
-                    return;
-                }
-                Quagga.start();
-                document.getElementById('statusLeitura').innerText = "Câmera Pronta! Aponte para o código.";
-            });
+<script>
 
-            Quagga.onDetected(function(result) {
-                const codigoLido = result.codeResult.code;
-                document.getElementById('statusLeitura').innerText = `Código lido: ${codigoLido}`;
-                adicionarItemALista(codigoLido);
-                
-                Quagga.stop();
-                setTimeout(() => { 
-                    Quagga.start(); 
-                    document.getElementById('statusLeitura').innerText = "Pronto para a próxima leitura.";
-                }, 2000); 
-            });
-        }
+// CONFIG
+const SITE = "https://anheuserbuschinbev.sharepoint.com/sites/Melhoria";
+const LIST = "ContAvaria";
+const TYPE = "SP.Data.ContAvariaListItem"; // confirme isso!
 
-        function adicionarItemALista(ean) {
-            const eanLimpo = ean.trim(); 
-            const produto = bancoCadastroProdutos[eanLimpo] || { codigo: "N/A", descricao: "Produto não cadastrado" };
-            const tabelaBody = document.querySelector('#tabelaConferidos tbody');
+let lendo = false;
+let cameraAtiva = false;
 
-            const novaLinha = document.createElement('tr');
-            novaLinha.innerHTML = `
-                <td>${eanLimpo}</td>
-                <td>${produto.codigo}</td>
-                <td>${produto.descricao}</td>
-                <td>1</td>`;
+// BANCO
+const produtos = {
+"7908371602560": {codigo:"1743",descricao:"ANTARCTICA 1L"},
+"38992": {codigo:"9068",descricao:"SKOL LATA"}
+};
 
-            tabelaBody.appendChild(novaLinha);
-        }
+// CAMERA
+function iniciarCamera(){
+if(cameraAtiva) return;
+cameraAtiva = true;
 
-        // FUNÇÃO DE ENVIO CORRIGIDA E ADAPTADA
-        async function enviarParaSharePoint() {
-            const rows = document.querySelectorAll('#tabelaConferidos tbody tr');
-            
-            if (rows.length === 0) {
-                alert("Não existem itens na tabela para enviar!");
-                return;
-            }
+Quagga.init({
+inputStream:{type:"LiveStream",target:document.getElementById('camera'),constraints:{facingMode:"environment"}},
+decoder:{readers:["ean_reader","code_128_reader"]}
+},
+err=>{
+if(err){alert("Erro camera");return;}
+Quagga.start();
+});
 
-            document.getElementById('statusLeitura').innerText = "Solicitando token de segurança do SharePoint...";
-            let formDigest = "";
+Quagga.onDetected(res=>{
+if(lendo) return;
+lendo = true;
 
-            // 1. Busca o Token de Validação da Requisição (FormDigest)
-            try {
-                const contextResponse = await fetch(`${SHAREPOINT_CONFIG.siteUrl}/_api/contextinfo`, {
-                    method: "POST",
-                    headers: { "Accept": "application/json;odata=verbose" }
-                });
-                
-                if (!contextResponse.ok) throw new Error("Falha ao obter o Context Info do SharePoint.");
-                
-                const contextData = await contextResponse.json();
-                formDigest = contextData.d.GetContextWebInformation.FormDigestValue;
-            } catch (e) {
-                console.error(e);
-                alert("Erro crítico: Não foi possível autenticar no SharePoint. Certifique-se de que este arquivo HTML está rodando de dentro do ambiente do SharePoint da Ambev.");
-                document.getElementById('statusLeitura').innerText = "Erro de autenticação.";
-                return;
-            }
+let code = res.codeResult.code;
+if(code.length < 5) return;
 
-            document.getElementById('statusLeitura').innerText = "Enviando itens para a lista...";
+beep();
+add(code);
 
-            // 2. Processa e envia item por item
-            for (const row of rows) {
-                const ean = row.cells[0].textContent;
-                const codigo = row.cells[1].textContent;
-                const descricao = row.cells[2].textContent;
-                const quantidade = row.cells[3].textContent;
+setTimeout(()=>lendo=false,2000);
+});
+}
 
-                // Montagem do payload aceito pelo REST API do SharePoint
-                const itemData = {
-                    "__metadata": { "type": `SP.Data.${SHAREPOINT_CONFIG.listName}ListItem` },
-                    [SHAREPOINT_CONFIG.colunas.ean]: ean,
-                    [SHAREPOINT_CONFIG.colunas.codigo]: codigo,
-                    [SHAREPOINT_CONFIG.colunas.descricao]: descricao,
-                    [SHAREPOINT_CONFIG.colunas.quantidade]: parseInt(quantidade)
-                };
+// SOM
+function beep(){
+new Audio("https://www.soundjay.com/buttons/sounds/button-16.mp3").play();
+}
 
-                try {
-                    const endpoint = `${SHAREPOINT_CONFIG.siteUrl}/_api/web/lists/getbytitle('${SHAREPOINT_CONFIG.listName}')/items`;
-                    
-                    const response = await fetch(endpoint, {
-                        method: "POST",
-                        headers: {
-                            "Accept": "application/json;odata=verbose",
-                            "Content-Type": "application/json;odata=verbose",
-                            "X-RequestDigest": formDigest
-                        },
-                        body: JSON.stringify(itemData)
-                    });
+// ADD ITEM
+function add(ean){
 
-                    if (response.ok) {
-                        row.style.backgroundColor = "#d4edda"; // Verde para sucesso
-                    } else {
-                        row.style.backgroundColor = "#f8d7da"; // Vermelho para erro
-                        const errorDetails = await response.text();
-                        console.error("Erro retornado pelo SharePoint:", errorDetails);
-                    }
-                } catch (error) {
-                    console.error("Erro na comunicação com a API:", error);
-                    row.style.backgroundColor = "#f8d7da";
-                }
-            }
-            
-            document.getElementById('statusLeitura').innerText = "Envio concluído.";
-            alert("Processo finalizado. Verifique as linhas verdes na tabela.");
-        }
-    </script>
+let tabela = document.getElementById("lista");
+let rows = tabela.querySelectorAll("tr");
+
+for(let r of rows){
+if(r.cells[0].innerText==ean){
+r.cells[3].innerText = parseInt(r.cells[3].innerText)+1;
+return;
+}
+}
+
+let p = produtos[ean] || {codigo:"N/A",descricao:"NÃO CADASTRADO"};
+
+let tr = document.createElement("tr");
+
+if(p.codigo=="N/A") tr.style.background="#fff3cd";
+
+tr.innerHTML = `
+<td>${ean}</td>
+<td>${p.codigo}</td>
+<td>${p.descricao}</td>
+<td>1</td>
+`;
+
+tabela.appendChild(tr);
+}
+
+// LIMPAR
+function limpar(){
+document.getElementById("lista").innerHTML="";
+}
+
+// ENVIAR
+async function enviar(){
+
+let rows = document.querySelectorAll("#lista tr");
+if(rows.length==0){alert("Sem dados");return;}
+
+let digest;
+
+try{
+let r = await fetch(SITE+"/_api/contextinfo",{method:"POST"});
+let d = await r.json();
+digest = d.d.GetContextWebInformation.FormDigestValue;
+}catch(e){
+alert("ERRO LOGIN SHAREPOINT");
+return;
+}
+
+for(let row of rows){
+
+let ean = row.cells[0].innerText;
+let codigo = row.cells[1].innerText;
+let desc = row.cells[2].innerText;
+let qtd = parseInt(row.cells[3].innerText);
+
+let data = {
+"__metadata": {"type": TYPE},
+"Title": ean,
+"EAN": ean,
+"codigo": codigo,
+"descricao": desc,
+"und": qtd
+};
+
+try{
+let res = await fetch(SITE+`/_api/web/lists/getbytitle('${LIST}')/items`,{
+method:"POST",
+headers:{
+"Accept":"application/json;odata=verbose",
+"Content-Type":"application/json;odata=verbose",
+"X-RequestDigest":digest
+},
+body:JSON.stringify(data)
+});
+
+row.style.background = res.ok ? "#d4edda" : "#f8d7da";
+
+}catch(e){
+row.style.background="#f8d7da";
+}
+
+}
+
+alert("Finalizado");
+
+}
+
+</script>
+
 </body>
 </html>
+``
