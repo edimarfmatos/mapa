@@ -1,188 +1,321 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Coletor de Avarias</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuluka - Sistema de IA</title>
+    <style>
+        /* Estilos Gerais e Temáticos (Futurista/Dark) */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+        body {
+            background-color: #0b0f19;
+            color: #e2e8f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
 
-<style>
-body { font-family: Arial; margin: 15px; background:#f4f5f7;}
-#camera { width:100%; height:300px; background:#000; border:3px solid #0078d4;}
-.btn { padding:12px; margin:5px; font-weight:bold; border:none; cursor:pointer;}
-.btn-blue {background:#0078d4;color:#fff;}
-.btn-green {background:#107c41;color:#fff;}
-table {width:100%; margin-top:10px; background:#fff;}
-td,th{padding:10px;border:1px solid #ddd;}
-</style>
+        /* CARD PRINCIPAL */
+        .container {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 16px;
+            width: 400px;
+            height: 600px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        /* 1. TELA DE LOGIN (CHAVE API) */
+        #tela-login {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            text-align: center;
+        }
+
+        #tela-login h3 {
+            font-size: 1.2rem;
+            color: #3b82f6;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .input-estilizado {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(31, 41, 55, 0.6);
+            border: 1px solid rgba(75, 85, 99, 0.5);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.95rem;
+            margin-bottom: 16px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .input-estilizado:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+        }
+
+        .botao-estilizado {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.3s, transform 0.1s;
+        }
+
+        .botao-estilizado:hover {
+            background: linear-gradient(135deg, #2563eb, #1e40af);
+        }
+
+        .botao-estilizado:active {
+            transform: scale(0.98);
+        }
+
+        /* 2. TELA DO CHAT (FULUKA) */
+        #tela-chat {
+            display: none; /* Começa escondida */
+            flex-direction: column;
+            height: 100%;
+        }
+
+        /* Órbita Visual da Fuluka */
+        .painel-orbita {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px 0;
+            margin-bottom: 10px;
+        }
+
+        .orbita {
+            width: 70px;
+            height: 70px;
+            border: 3px solid rgba(59, 130, 246, 0.3);
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            animation: rodar 2s linear infinite;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .nucleo-orbita {
+            width: 40px;
+            height: 40px;
+            background: radial-gradient(circle, #3b82f6, #1d4ed8);
+            border-radius: 50%;
+            box-shadow: 0 0 15px #3b82f6;
+            animation: pulsar 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes rodar {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes pulsar {
+            0% { transform: scale(0.9); opacity: 0.7; }
+            100% { transform: scale(1.1); opacity: 1; }
+        }
+
+        /* Área das Mensagens */
+        #historico-chat {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 5px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Estilo dos Balões */
+        .mensagem {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .mensagem.usuario {
+            background-color: #2563eb;
+            color: #fff;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+
+        .mensagem.fuluka {
+            background-color: #1f2937;
+            color: #e2e8f0;
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Rodapé de Entrada de Texto */
+        .painel-input {
+            display: flex;
+            gap: 8px;
+        }
+
+        .painel-input input {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .painel-input button {
+            width: auto;
+            padding: 0 20px;
+        }
+    </style>
 </head>
-
 <body>
 
-<h2>Coletor de Avarias</h2>
+    <div class="container">
+        
+        <div id="tela-login">
+            <h3>Identifique-se, por favor</h3>
+            <input type="password" id="chave-api" class="input-estilizado" placeholder="Cole sua chave Gemini API aqui...">
+            <button onclick="conectarSistema()" class="botao-estilizado">Acessar Sistema</button>
+        </div>
 
-<div id="camera"></div>
+        <div id="tela-chat">
+            <div class="painel-orbita">
+                <div class="orbita">
+                    <div class="nucleo-orbita"></div>
+                </div>
+            </div>
 
-<button class="btn btn-blue" onclick="iniciarCamera()">Ligar câmera</button>
-<button class="btn btn-green" onclick="enviar()">Enviar</button>
-<button class="btn" onclick="limpar()">Limpar</button>
+            <div id="historico-chat">
+                <div class="mensagem fuluka">Matriz quântica online. Como posso ajudar você hoje?</div>
+            </div>
 
-<div id="status"></div>
+            <div class="painel-input">
+                <input type="text" id="mensagem-usuario" class="input-estilizado" placeholder="Fale com a Fuluka..." onkeydown="verificarTecla(event)">
+                <button onclick="enviarMensagem()" class="botao-estilizado">➔</button>
+            </div>
+        </div>
 
-<table>
-<thead>
-<tr>
-<th>EAN</th>
-<th>Código</th>
-<th>Descrição</th>
-<th>Qtd</th>
-</tr>
-</thead>
-<tbody id="lista"></tbody>
-</table>
+    </div>
 
-<script>
+    <script>
+        // Variável global que guardará a chave apenas na memória do navegador
+        let apiKey = "";
 
-// CONFIG
-const SITE = "https://anheuserbuschinbev.sharepoint.com/sites/Melhoria";
-const LIST = "ContAvaria";
-const TYPE = "SP.Data.ContAvariaListItem"; // confirme isso!
+        // Função que valida a entrada da chave e altera as telas
+        function conectarSistema() {
+            const campoChave = document.getElementById("chave-api").value.trim();
 
-let lendo = false;
-let cameraAtiva = false;
+            if (campoChave === "") {
+                alert("Por favor, insira a sua chave de acesso para ativar a Fuluka.");
+                return;
+            }
 
-// BANCO
-const produtos = {
-"7908371602560": {codigo:"1743",descricao:"ANTARCTICA 1L"},
-"38992": {codigo:"9068",descricao:"SKOL LATA"}
-};
+            // Armazena temporariamente na variável de memória
+            apiKey = campoChave;
 
-// CAMERA
-function iniciarCamera(){
-if(cameraAtiva) return;
-cameraAtiva = true;
+            // Transição visual de telas
+            document.getElementById("tela-login").style.display = "none";
+            document.getElementById("tela-chat").style.display = "flex";
+        }
 
-Quagga.init({
-inputStream:{type:"LiveStream",target:document.getElementById('camera'),constraints:{facingMode:"environment"}},
-decoder:{readers:["ean_reader","code_128_reader"]}
-},
-err=>{
-if(err){alert("Erro camera");return;}
-Quagga.start();
-});
+        // Detecta o botão Enter no campo de mensagem para facilitar o envio
+        function verificarTecla(event) {
+            if (event.key === "Enter") {
+                enviarMensagem();
+            }
+        }
 
-Quagga.onDetected(res=>{
-if(lendo) return;
-lendo = true;
+        // Função responsável por processar e enviar a mensagem para a API do Gemini
+        async function enviarMensagem() {
+            const inputMensagem = document.getElementById("mensagem-usuario");
+            const textoMensagem = inputMensagem.value.trim();
+            const historico = document.getElementById("historico-chat");
 
-let code = res.codeResult.code;
-if(code.length < 5) return;
+            if (textoMensagem === "") return;
 
-beep();
-add(code);
+            // 1. Adiciona a mensagem do Usuário na tela
+            const divUsuario = document.createElement("div");
+            divUsuario.className = "mensagem usuario";
+            divUsuario.textContent = textoMensagem;
+            historico.appendChild(divUsuario);
 
-setTimeout(()=>lendo=false,2000);
-});
-}
+            // Limpa o campo de texto e rola para baixo
+            inputMensagem.value = "";
+            historico.scrollTop = historico.scrollHeight;
 
-// SOM
-function beep(){
-new Audio("https://www.soundjay.com/buttons/sounds/button-16.mp3").play();
-}
+            // 2. Cria o balão de resposta temporária da Fuluka (Carregando...)
+            const divFuluka = document.createElement("div");
+            divFuluka.className = "mensagem fuluka";
+            divFuluka.textContent = "Processando dados...";
+            historico.appendChild(divFuluka);
+            historico.scrollTop = historico.scrollHeight;
 
-// ADD ITEM
-function add(ean){
+            // 3. Conexão real com a API do Gemini utilizando a chave fornecida na senha
+            // Modelo atualizado para a versão gemini-1.5-flash
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-let tabela = document.getElementById("lista");
-let rows = tabela.querySelectorAll("tr");
+            const dadosRequisicao = {
+                contents: [{
+                    parts: [{ text: textoMensagem }]
+                }]
+            };
 
-for(let r of rows){
-if(r.cells[0].innerText==ean){
-r.cells[3].innerText = parseInt(r.cells[3].innerText)+1;
-return;
-}
-}
+            try {
+                const resposta = await fetch(url, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(dadosRequisicao)
+                });
 
-let p = produtos[ean] || {codigo:"N/A",descricao:"NÃO CADASTRADO"};
+                if (!resposta.ok) {
+                    throw new Error("Falha na comunicação com o servidor.");
+                }
 
-let tr = document.createElement("tr");
+                const dadosRetornados = await resposta.json();
+                
+                // Extrai o texto da resposta do JSON do Gemini
+                const respostaTexto = dadosRetornados.candidates[0].content.parts[0].text;
+                
+                // Atualiza o balão da Fuluka com a resposta real
+                divFuluka.textContent = respostaTexto;
 
-if(p.codigo=="N/A") tr.style.background="#fff3cd";
+            } catch (error) {
+                console.error(error);
+                divFuluka.textContent = "Erro crítico de conexão: Verifique se sua chave de acesso está correta ou se o limite foi atingido.";
+                divFuluka.style.borderColor = "#ef4444"; // Borda vermelha indicando erro
+            }
 
-tr.innerHTML = `
-<td>${ean}</td>
-<td>${p.codigo}</td>
-<td>${p.descricao}</td>
-<td>1</td>
-`;
-
-tabela.appendChild(tr);
-}
-
-// LIMPAR
-function limpar(){
-document.getElementById("lista").innerHTML="";
-}
-
-// ENVIAR
-async function enviar(){
-
-let rows = document.querySelectorAll("#lista tr");
-if(rows.length==0){alert("Sem dados");return;}
-
-let digest;
-
-try{
-let r = await fetch(SITE+"/_api/contextinfo",{method:"POST"});
-let d = await r.json();
-digest = d.d.GetContextWebInformation.FormDigestValue;
-}catch(e){
-alert("ERRO LOGIN SHAREPOINT");
-return;
-}
-
-for(let row of rows){
-
-let ean = row.cells[0].innerText;
-let codigo = row.cells[1].innerText;
-let desc = row.cells[2].innerText;
-let qtd = parseInt(row.cells[3].innerText);
-
-let data = {
-"__metadata": {"type": TYPE},
-"Title": ean,
-"EAN": ean,
-"codigo": codigo,
-"descricao": desc,
-"und": qtd
-};
-
-try{
-let res = await fetch(SITE+`/_api/web/lists/getbytitle('${LIST}')/items`,{
-method:"POST",
-headers:{
-"Accept":"application/json;odata=verbose",
-"Content-Type":"application/json;odata=verbose",
-"X-RequestDigest":digest
-},
-body:JSON.stringify(data)
-});
-
-row.style.background = res.ok ? "#d4edda" : "#f8d7da";
-
-}catch(e){
-row.style.background="#f8d7da";
-}
-
-}
-
-alert("Finalizado");
-
-}
-
-</script>
-
+            // Garante que o scroll acompanhe o final da resposta
+            historico.scrollTop = historico.scrollHeight;
+        }
+    </script>
 </body>
 </html>
-``
