@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leitor de Código - Ambev</title>
-    <!-- Biblioteca QuaggaJS para leitura de Código de Barras pela Câmera -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <!-- Biblioteca HTML5-QRCode (ZXing Engine - Leitura Rápida 360° e Precisa) -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -97,31 +97,25 @@
             white-space: nowrap;
         }
 
-        /* Modal do Leitor de Câmera */
+        /* Modal da Câmera */
         #cameraModal {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0,0,0,0.9);
             z-index: 9999;
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            padding: 15px;
         }
 
-        #interactive.viewport {
-            width: 300px;
-            height: 250px;
-            overflow: hidden;
-            position: relative;
-            border: 2px solid #fff;
-            border-radius: 8px;
-        }
-
-        #interactive.viewport video, canvas {
+        #reader {
             width: 100%;
-            height: 100%;
-            object-fit: cover;
+            max-width: 400px;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
         }
 
         .btn-close-cam {
@@ -129,10 +123,11 @@
             background: #e74c3c;
             color: white;
             border: none;
-            padding: 10px 20px;
+            padding: 10px 24px;
             border-radius: 4px;
             font-weight: bold;
             cursor: pointer;
+            font-size: 1rem;
         }
 
         .main-grid {
@@ -275,7 +270,7 @@
                 </div>
                 <div class="sub-cell">
                     <span class="cell-label">Tipo</span>
-                    <input type="text" id="tipo" id="medida" placeholder="CX/PL">
+                    <input type="text" id="tipo" placeholder="CX/PL">
                 </div>
             </div>
 
@@ -300,7 +295,7 @@
 
 <!-- Modal para uso da Câmera -->
 <div id="cameraModal">
-    <div id="interactive" class="viewport"></div>
+    <div id="reader"></div>
     <button class="btn-close-cam" id="btnCloseCam">Fechar Câmera</button>
 </div>
 
@@ -315,7 +310,7 @@
     const recebimentoInput = document.getElementById('recebimento');
     const tipoInput = document.getElementById('tipo');
 
-    // 1. Preenche a Data de Recebimento Automaticamente (Hoje)
+    // Data de Recebimento Hoje
     function setHojeRecebimento() {
         const hoje = new Date();
         const d = String(hoje.getDate()).padStart(2, '0');
@@ -325,14 +320,14 @@
     }
     setHojeRecebimento();
 
-    // 2. Gerador de Som Bip (Web Audio API)
+    // Bip Sonoro Instantâneo
     function tocarBip() {
         try {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.type = "sine";
-            osc.frequency.value = 1800; // Frequência do bip em Hz
+            osc.frequency.value = 1800;
             gain.gain.value = 0.1;
             osc.connect(gain);
             gain.connect(audioCtx.destination);
@@ -340,13 +335,11 @@
             setTimeout(() => {
                 osc.stop();
                 audioCtx.close();
-            }, 120); // Duração de 120ms
-        } catch(e) {
-            console.log("Sons bloqueados pelo navegador");
-        }
+            }, 100);
+        } catch(e) {}
     }
 
-    // 3. Busca de EAN na Planilha (Debounce de 300ms)
+    // Busca de EAN no Google Sheets
     let debounceTimer = null;
     function buscarEAN(valor) {
         const val = valor.trim();
@@ -367,7 +360,7 @@
                 }
             })
             .catch(err => {
-                console.error("Erro na busca:", err);
+                console.error(err);
                 descricaoInput.value = "ERRO NA BUSCA";
             });
     }
@@ -377,7 +370,7 @@
         debounceTimer = setTimeout(() => buscarEAN(this.value), 300);
     });
 
-    // 4. Cálculo de Data de Bloqueio (1 Mês Antes do Vencimento)
+    // Cálculo da Data de Bloqueio
     vencimentoInput.addEventListener('input', function() {
         const partes = this.value.split('/');
         if (partes.length === 3 && partes[2].length === 4) {
@@ -400,43 +393,57 @@
         }
     });
 
-    // 5. Leitor de Câmera (QuaggaJS)
+    // Leitor HTML5QRCode (Motor ZXing - Ultra-rápido, 360° e Preciso)
+    let html5QrcodeScanner = null;
     const cameraModal = document.getElementById('cameraModal');
     const btnOpenCam = document.getElementById('btnOpenCam');
     const btnCloseCam = document.getElementById('btnCloseCam');
 
     btnOpenCam.addEventListener('click', () => {
         cameraModal.style.display = 'flex';
-        Quagga.init({
-            inputStream: {
-                name: "Live",
-                type: "LiveStream",
-                target: document.querySelector('#interactive'),
-                constraints: { facingMode: "environment" }
+        
+        if (!html5QrcodeScanner) {
+            html5QrcodeScanner = new Html5Qrcode("reader");
+        }
+
+        const config = { 
+            fps: 15, 
+            qrbox: { width: 280, height: 180 },
+            formatsToSupport: [ 
+                Html5QrcodeSupportedFormats.EAN_13, 
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.CODE_128 
+            ]
+        };
+
+        html5QrcodeScanner.start(
+            { facingMode: "environment" }, 
+            config, 
+            (decodedText) => {
+                // Sucesso ao ler
+                eanInput.value = decodedText;
+                buscarEAN(decodedText);
+                fecharCamera();
             },
-            decoder: { readers: ["ean_reader", "ean_8_reader", "code_128_reader"] }
-        }, function(err) {
-            if (err) {
-                alert("Erro ao abrir a câmera: " + err);
-                cameraModal.style.display = 'none';
-                return;
+            (errorMessage) => {
+                // Tentativas de leitura contínuas (silencioso)
             }
-            Quagga.start();
+        ).catch(err => {
+            alert("Erro ao abrir a câmera: " + err);
+            fecharCamera();
         });
     });
 
-    Quagga.onDetected((result) => {
-        if (result && result.codeResult && result.codeResult.code) {
-            const code = result.codeResult.code;
-            eanInput.value = code;
-            buscarEAN(code);
-            fecharCamera();
-        }
-    });
-
     function fecharCamera() {
-        Quagga.stop();
-        cameraModal.style.display = 'none';
+        if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
+            html5QrcodeScanner.stop().then(() => {
+                cameraModal.style.display = 'none';
+            }).catch(() => {
+                cameraModal.style.display = 'none';
+            });
+        } else {
+            cameraModal.style.display = 'none';
+        }
     }
 
     btnCloseCam.addEventListener('click', fecharCamera);
