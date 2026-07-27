@@ -322,7 +322,8 @@
 </div>
 
 <script>
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxNNiz23sew5OyKCRi8lX_RLjd7b-YvBr7biFEE6p0JjHbrdGHaHUDOGP66BHnq_CMvgQ/exec";
+   
+   const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxNNiz23sew5OyKCRi8lX_RLjd7b-YvBr7biFEE6p0JjHbrdGHaHUDOGP66BHnq_CMvgQ/exec";
 
     const eanInput = document.getElementById('eanInput');
     const codigoInput = document.getElementById('codigo');
@@ -338,7 +339,7 @@
 
     let qrcodeObj = null;
 
-    // Inicializa a data atual no Recebimento
+    // Data de Recebimento Hoje
     function setHojeRecebimento() {
         const hoje = new Date();
         const d = String(hoje.getDate()).padStart(2, '0');
@@ -348,7 +349,7 @@
     }
     setHojeRecebimento();
 
-    // Som de leitura do Bip
+    // Bip Sonoro Instantâneo
     function tocarBip() {
         try {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -377,7 +378,7 @@
             return;
         }
 
-        // JSON estruturado com chave única (EAN_VENCIMENTO)
+        // Payload estruturado em JSON
         const payload = {
             id: `${eanVal}_${vencVal}`,
             ean: eanVal,
@@ -397,32 +398,40 @@
         });
     }
 
-    // Processamento da Leitura (Detecta JSON do QR Code ou EAN normal)
+    // Processador Inteligente (Reconhece se é QR Code JSON ou Código EAN)
     let debounceTimer = null;
     function processarLeitura(valor) {
-        const val = valor.trim();
+        let val = valor.trim();
         if (val.length < 5) return;
 
-        // Tenta interpretar como JSON de folha/QR Code
-        if (val.startsWith('{') && val.endsWith('}')) {
+        // 1. Tenta extrair um JSON do texto lido (Procura entre a primeira '{' e a última '}')
+        const inicioJson = val.indexOf('{');
+        const fimJson = val.lastIndexOf('}');
+
+        if (inicioJson !== -1 && fimJson !== -1 && fimJson > inicioJson) {
+            const jsonString = val.substring(inicioJson, fimJson + 1);
             try {
-                const data = JSON.parse(val);
-                tocarBip();
-                codigoInput.value = data.cod || "";
-                descricaoInput.value = data.desc || "";
-                vencimentoInput.value = data.venc || "";
-                bloqueioInput.value = data.bloq || "";
-                if (data.rec) recebimentoInput.value = data.rec;
-                if (data.ean) eanInput.value = data.ean;
+                const data = JSON.parse(jsonString);
                 
-                atualizarQRCode();
-                return;
+                // Se o JSON contém os dados do nosso QR Code
+                if (data.id || data.ean) {
+                    tocarBip();
+                    if (data.ean) eanInput.value = data.ean;
+                    if (data.cod) codigoInput.value = data.cod;
+                    if (data.desc) descricaoInput.value = data.desc;
+                    if (data.venc) vencimentoInput.value = data.venc;
+                    if (data.bloq) bloqueioInput.value = data.bloq;
+                    if (data.rec) recebimentoInput.value = data.rec;
+                    
+                    atualizarQRCode();
+                    return; // Encerra aqui pois era um QR Code válido
+                }
             } catch(e) {
-                console.warn("Entrada não é um JSON válido.");
+                console.warn("Falha ao interpretar estrutura JSON:", e);
             }
         }
 
-        // Se for um EAN normal
+        // 2. Se não for um QR Code válido, trata como EAN/Código de Barras normal
         descricaoInput.value = "BUSCANDO...";
         fetch(`${WEB_APP_URL}?ean=${encodeURIComponent(val)}`)
             .then(res => res.json())
@@ -449,12 +458,22 @@
             });
     }
 
+    // Escuta a entrada do leitor no campo de bip
     eanInput.addEventListener('input', function() {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => processarLeitura(this.value), 300);
+        debounceTimer = setTimeout(() => processarLeitura(this.value), 250);
     });
 
-    // Cálculo da Data de Bloqueio e atualização do QR Code
+    // Se o leitor físico enviar um "ENTER" ao final do bip, processa imediatamente
+    eanInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            clearTimeout(debounceTimer);
+            processarLeitura(this.value);
+        }
+    });
+
+    // Cálculo da Data de Bloqueio
     vencimentoInput.addEventListener('input', function() {
         const partes = this.value.split('/');
         if (partes.length === 3 && partes[2].length === 4) {
@@ -480,12 +499,12 @@
 
     codigoInput.addEventListener('input', atualizarQRCode);
 
-    // Impressão da folha de identificação
+    // Impressão da folha
     document.getElementById('btnImprimir').addEventListener('click', () => {
         window.print();
     });
 
-    // Envio dos dados para o Google Sheets
+    // Envio dos dados
     document.getElementById('formPrincipal').addEventListener('submit', function(e) {
         e.preventDefault();
         
@@ -524,7 +543,7 @@
         });
     });
 
-    // Leitor via Câmera
+    // Câmera do Celular / Tablet
     let html5QrcodeScanner = null;
     const cameraModal = document.getElementById('cameraModal');
     const btnOpenCam = document.getElementById('btnOpenCam');
@@ -539,7 +558,7 @@
 
         const config = { 
             fps: 30, 
-            qrbox: { width: 300, height: 160 },
+            qrbox: { width: 280, height: 280 }, // Aumentado o quadrado para facilitar a leitura de QR Code
             videoConstraints: {
                 facingMode: "environment",
                 width: { min: 640, ideal: 1280 },
