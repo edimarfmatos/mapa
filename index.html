@@ -1,321 +1,445 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fuluka - Sistema de IA</title>
+    <title>Leitor de Código - Ambev</title>
+    <!-- Biblioteca QuaggaJS para leitura de Código de Barras pela Câmera -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
     <style>
-        /* Estilos Gerais e Temáticos (Futurista/Dark) */
         * {
             box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         body {
-            background-color: #0b0f19;
-            color: #e2e8f0;
+            background-color: #f2f3f7;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 720px;
+            background: #ffffff;
+            border: 1.5px solid #dcdcdc;
+            border-radius: 6px;
             overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
 
-        /* CARD PRINCIPAL */
-        .container {
-            background: rgba(17, 24, 39, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(59, 130, 246, 0.2);
-            border-radius: 16px;
-            width: 400px;
-            height: 600px;
-            padding: 24px;
+        .top-bar {
             display: flex;
-            flex-direction: column;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-        }
-
-        /* 1. TELA DE LOGIN (CHAVE API) */
-        #tela-login {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
+            justify-content: space-between;
             align-items: center;
-            height: 100%;
-            text-align: center;
+            background-color: #ffffff;
+            padding: 6px 10px;
+            border-bottom: 1.5px solid #b0c4de;
         }
 
-        #tela-login h3 {
-            font-size: 1.2rem;
-            color: #3b82f6;
-            letter-spacing: 2px;
-            margin-bottom: 20px;
+        .btn-top {
+            background-color: #1a56c4;
+            color: white;
+            font-weight: bold;
+            font-size: 0.95rem;
+            padding: 6px 18px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
             text-transform: uppercase;
         }
 
-        .input-estilizado {
-            width: 100%;
-            padding: 12px 16px;
-            background: rgba(31, 41, 55, 0.6);
-            border: 1px solid rgba(75, 85, 99, 0.5);
-            border-radius: 8px;
-            color: #fff;
-            font-size: 0.95rem;
-            margin-bottom: 16px;
-            outline: none;
-            transition: all 0.3s;
-        }
-
-        .input-estilizado:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
-        }
-
-        .botao-estilizado {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-            border: none;
-            border-radius: 8px;
-            color: white;
+        .brand-title {
+            font-size: 1.3rem;
             font-weight: bold;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: background 0.3s, transform 0.1s;
+            color: #2c3e50;
         }
 
-        .botao-estilizado:hover {
-            background: linear-gradient(135deg, #2563eb, #1e40af);
-        }
-
-        .botao-estilizado:active {
-            transform: scale(0.98);
-        }
-
-        /* 2. TELA DO CHAT (FULUKA) */
-        #tela-chat {
-            display: none; /* Começa escondida */
-            flex-direction: column;
-            height: 100%;
-        }
-
-        /* Órbita Visual da Fuluka */
-        .painel-orbita {
+        .ean-bar-scanner {
+            background: #eef2f7;
+            padding: 6px 10px;
+            border-top: 1px solid #c8d3df;
             display: flex;
-            justify-content: center;
             align-items: center;
-            padding: 10px 0;
-            margin-bottom: 10px;
-        }
-
-        .orbita {
-            width: 70px;
-            height: 70px;
-            border: 3px solid rgba(59, 130, 246, 0.3);
-            border-top: 3px solid #3b82f6;
-            border-radius: 50%;
-            animation: rodar 2s linear infinite;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .nucleo-orbita {
-            width: 40px;
-            height: 40px;
-            background: radial-gradient(circle, #3b82f6, #1d4ed8);
-            border-radius: 50%;
-            box-shadow: 0 0 15px #3b82f6;
-            animation: pulsar 1.5s ease-in-out infinite alternate;
-        }
-
-        @keyframes rodar {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        @keyframes pulsar {
-            0% { transform: scale(0.9); opacity: 0.7; }
-            100% { transform: scale(1.1); opacity: 1; }
-        }
-
-        /* Área das Mensagens */
-        #historico-chat {
-            flex: 1;
-            overflow-y: auto;
-            padding-right: 5px;
-            margin-bottom: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        /* Estilo dos Balões */
-        .mensagem {
-            max-width: 85%;
-            padding: 10px 14px;
-            border-radius: 12px;
-            font-size: 0.95rem;
-            line-height: 1.4;
-            word-wrap: break-word;
-        }
-
-        .mensagem.usuario {
-            background-color: #2563eb;
-            color: #fff;
-            align-self: flex-end;
-            border-bottom-right-radius: 2px;
-        }
-
-        .mensagem.fuluka {
-            background-color: #1f2937;
-            color: #e2e8f0;
-            align-self: flex-start;
-            border-bottom-left-radius: 2px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        /* Rodapé de Entrada de Texto */
-        .painel-input {
-            display: flex;
             gap: 8px;
         }
 
-        .painel-input input {
-            flex: 1;
-            margin-bottom: 0;
+        .ean-bar-scanner label {
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: #555;
+            white-space: nowrap;
         }
 
-        .painel-input button {
-            width: auto;
-            padding: 0 20px;
+        .ean-bar-scanner input {
+            width: 100%;
+            border: 1px solid #b0c4de;
+            border-radius: 3px;
+            padding: 4px 8px;
+            font-weight: bold;
+            font-size: 0.9rem;
         }
+
+        .btn-camera {
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+
+        /* Modal do Leitor de Câmera */
+        #cameraModal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 9999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #interactive.viewport {
+            width: 300px;
+            height: 250px;
+            overflow: hidden;
+            position: relative;
+            border: 2px solid #fff;
+            border-radius: 8px;
+        }
+
+        #interactive.viewport video, canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .btn-close-cam {
+            margin-top: 15px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 90px 1.1fr 1.3fr;
+            grid-template-rows: auto auto auto;
+            border-collapse: collapse;
+        }
+
+        .cell {
+            border: 1px solid #c8d3df;
+            padding: 6px 8px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background-color: #fff;
+        }
+
+        .cell-label {
+            font-size: 0.65rem;
+            color: #7f8c8d;
+            font-weight: 700;
+            margin-bottom: 2px;
+            text-transform: uppercase;
+        }
+
+        .cell input, .cell select {
+            border: none;
+            outline: none;
+            background: transparent;
+            width: 100%;
+            font-weight: bold;
+        }
+
+        .cell-printer {
+            grid-column: 1 / 2;
+            grid-row: 1 / 2;
+            align-items: center;
+            justify-content: center;
+            background-color: #f8fafc;
+            min-height: 65px;
+        }
+
+        .printer-icon { width: 32px; height: 32px; opacity: 0.6; }
+
+        .cell-codigo { grid-column: 2 / 3; grid-row: 1 / 2; }
+        .cell-codigo input { font-size: 1.8rem; color: #1a252f; font-weight: 800; }
+
+        .cell-descricao { grid-column: 3 / 4; grid-row: 1 / 2; background-color: #fcfcfd; }
+        .cell-descricao input { font-size: 1.15rem; text-transform: uppercase; color: #111; font-weight: 900; margin-top: 4px; }
+
+        .cell-qrcode { grid-column: 1 / 2; grid-row: 2 / 3; align-items: center; justify-content: center; padding: 4px; }
+        .qr-placeholder {
+            width: 70px; height: 70px;
+            background: repeating-linear-gradient(45deg, #2c3e50, #2c3e50 4px, #fff 4px, #fff 8px);
+            border: 1px solid #333; border-radius: 2px;
+        }
+
+        .cell-vencimento { grid-column: 2 / 3; grid-row: 2 / 3; position: relative; background-color: #fff; }
+        .cell-vencimento input { font-size: 1.85rem; font-weight: 900; color: #000; margin-top: 2px; letter-spacing: -0.5px; }
+
+        .accent-blue-bar { position: absolute; right: 0; top: 0; bottom: 0; width: 8px; background-color: #1a56c4; }
+
+        .sub-grid-3 {
+            grid-column: 3 / 4; grid-row: 2 / 3;
+            display: grid; grid-template-columns: 2fr 0.8fr 0.8fr;
+            border-left: 1px solid #c8d3df; margin: -6px -8px;
+        }
+
+        .sub-cell { border-right: 1px solid #c8d3df; padding: 6px 4px; display: flex; flex-direction: column; justify-content: space-between; }
+        .sub-cell:last-child { border-right: none; }
+        .sub-cell select, .sub-cell input { font-size: 0.9rem; font-weight: bold; text-align: center; }
+        .sub-cell select { text-align: left; }
+
+        .cell-origem { grid-column: 1 / 2; grid-row: 3 / 4; min-height: 55px; }
+        .cell-bloqueio { grid-column: 2 / 3; grid-row: 3 / 4; }
+        .cell-bloqueio input { font-size: 1.25rem; color: #34495e; font-weight: bold; margin-top: 4px; }
+
+        .cell-recebimento { grid-column: 3 / 4; grid-row: 3 / 4; position: relative; }
+        .cell-recebimento input { font-size: 1.2rem; color: #2c3e50; font-weight: bold; margin-top: 4px; }
+        .accent-blue-bar-small { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; background-color: #1a56c4; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        
-        <div id="tela-login">
-            <h3>Identifique-se, por favor</h3>
-            <input type="password" id="chave-api" class="input-estilizado" placeholder="Cole sua chave Gemini API aqui...">
-            <button onclick="conectarSistema()" class="botao-estilizado">Acessar Sistema</button>
-        </div>
+<div class="app-container">
+    <div class="top-bar">
+        <button class="btn-top" type="button">Leitor</button>
+        <div class="brand-title">ambev</div>
+        <button class="btn-top" type="submit" form="formPrincipal">ENVIAR</button>
+    </div>
 
-        <div id="tela-chat">
-            <div class="painel-orbita">
-                <div class="orbita">
-                    <div class="nucleo-orbita"></div>
+    <div class="ean-bar-scanner">
+        <label for="eanInput">Bipar EAN:</label>
+        <input type="text" id="eanInput" placeholder="Escaneie ou digite..." autofocus>
+        <button type="button" class="btn-camera" id="btnOpenCam">📷 Câmera</button>
+    </div>
+
+    <form id="formPrincipal">
+        <div class="main-grid">
+            <div class="cell cell-printer">
+                <svg class="printer-icon" viewBox="0 0 24 24" fill="#333">
+                    <path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/>
+                </svg>
+            </div>
+
+            <div class="cell cell-codigo">
+                <span class="cell-label">Código</span>
+                <input type="text" id="codigo" placeholder="...">
+            </div>
+
+            <div class="cell cell-descricao">
+                <span class="cell-label">Descrição</span>
+                <input type="text" id="descricao" placeholder="..." readonly>
+            </div>
+
+            <div class="cell cell-qrcode">
+                <div class="qr-placeholder"></div>
+            </div>
+
+            <div class="cell cell-vencimento">
+                <span class="cell-label">Vencimento</span>
+                <input type="text" id="vencimento" placeholder="DD/MM/AAAA">
+                <div class="accent-blue-bar"></div>
+            </div>
+
+            <div class="sub-grid-3">
+                <div class="sub-cell">
+                    <span class="cell-label">Local</span>
+                    <select id="local">
+                        <option value="Tenda" selected>Tenda</option>
+                        <option value="Depósito">Depósito</option>
+                        <option value="Avarias">Avarias</option>
+                    </select>
+                </div>
+                <div class="sub-cell">
+                    <span class="cell-label">Qtd.</span>
+                    <input type="text" id="qtd" value="1">
+                </div>
+                <div class="sub-cell">
+                    <span class="cell-label">Tipo</span>
+                    <input type="text" id="tipo" id="medida" placeholder="CX/PL">
                 </div>
             </div>
 
-            <div id="historico-chat">
-                <div class="mensagem fuluka">Matriz quântica online. Como posso ajudar você hoje?</div>
+            <div class="cell cell-origem">
+                <span class="cell-label">Origem</span>
+                <input type="text" id="origem" placeholder="...">
             </div>
 
-            <div class="painel-input">
-                <input type="text" id="mensagem-usuario" class="input-estilizado" placeholder="Fale com a Fuluka..." onkeydown="verificarTecla(event)">
-                <button onclick="enviarMensagem()" class="botao-estilizado">➔</button>
+            <div class="cell cell-bloqueio">
+                <span class="cell-label">Bloqueio</span>
+                <input type="text" id="bloqueio" placeholder="Auto" readonly>
+            </div>
+
+            <div class="cell cell-recebimento">
+                <span class="cell-label">Data de Recebimento</span>
+                <input type="text" id="recebimento" readonly>
+                <div class="accent-blue-bar-small"></div>
             </div>
         </div>
+    </form>
+</div>
 
-    </div>
+<!-- Modal para uso da Câmera -->
+<div id="cameraModal">
+    <div id="interactive" class="viewport"></div>
+    <button class="btn-close-cam" id="btnCloseCam">Fechar Câmera</button>
+</div>
 
-    <script>
-        // Variável global que guardará a chave apenas na memória do navegador
-        let apiKey = "";
+<script>
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxNNiz23sew5OyKCRi8lX_RLjd7b-YvBr7biFEE6p0JjHbrdGHaHUDOGP66BHnq_CMvgQ/exec";
 
-        // Função que valida a entrada da chave e altera as telas
-        function conectarSistema() {
-            const campoChave = document.getElementById("chave-api").value.trim();
+    const eanInput = document.getElementById('eanInput');
+    const codigoInput = document.getElementById('codigo');
+    const descricaoInput = document.getElementById('descricao');
+    const vencimentoInput = document.getElementById('vencimento');
+    const bloqueioInput = document.getElementById('bloqueio');
+    const recebimentoInput = document.getElementById('recebimento');
+    const tipoInput = document.getElementById('tipo');
 
-            if (campoChave === "") {
-                alert("Por favor, insira a sua chave de acesso para ativar a Fuluka.");
+    // 1. Preenche a Data de Recebimento Automaticamente (Hoje)
+    function setHojeRecebimento() {
+        const hoje = new Date();
+        const d = String(hoje.getDate()).padStart(2, '0');
+        const m = String(hoje.getMonth() + 1).padStart(2, '0');
+        const a = hoje.getFullYear();
+        recebimentoInput.value = `${d}/${m}/${a}`;
+    }
+    setHojeRecebimento();
+
+    // 2. Gerador de Som Bip (Web Audio API)
+    function tocarBip() {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = "sine";
+            osc.frequency.value = 1800; // Frequência do bip em Hz
+            gain.gain.value = 0.1;
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            setTimeout(() => {
+                osc.stop();
+                audioCtx.close();
+            }, 120); // Duração de 120ms
+        } catch(e) {
+            console.log("Sons bloqueados pelo navegador");
+        }
+    }
+
+    // 3. Busca de EAN na Planilha (Debounce de 300ms)
+    let debounceTimer = null;
+    function buscarEAN(valor) {
+        const val = valor.trim();
+        if (val.length < 8) return;
+
+        descricaoInput.value = "BUSCANDO...";
+        fetch(`${WEB_APP_URL}?ean=${encodeURIComponent(val)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.encontrado) {
+                    tocarBip();
+                    codigoInput.value = data.codigo || "";
+                    descricaoInput.value = data.descricao || "";
+                    if (data.medida) tipoInput.value = data.medida;
+                } else {
+                    codigoInput.value = "";
+                    descricaoInput.value = "PRODUTO NÃO ENCONTRADO";
+                }
+            })
+            .catch(err => {
+                console.error("Erro na busca:", err);
+                descricaoInput.value = "ERRO NA BUSCA";
+            });
+    }
+
+    eanInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => buscarEAN(this.value), 300);
+    });
+
+    // 4. Cálculo de Data de Bloqueio (1 Mês Antes do Vencimento)
+    vencimentoInput.addEventListener('input', function() {
+        const partes = this.value.split('/');
+        if (partes.length === 3 && partes[2].length === 4) {
+            let dia = parseInt(partes[0], 10);
+            let mes = parseInt(partes[1], 10) - 1;
+            let ano = parseInt(partes[2], 10);
+
+            let dt = new Date(ano, mes, dia);
+            if (!isNaN(dt.getTime())) {
+                dt.setMonth(dt.getMonth() - 1);
+                if (dt.getDate() !== dia && dt.getDate() < 5) {
+                    dt.setDate(0);
+                }
+                let d = String(dt.getDate()).padStart(2, '0');
+                let m = String(dt.getMonth() + 1).padStart(2, '0');
+                let a = dt.getFullYear();
+
+                bloqueioInput.value = `${d}/${m}/${a}`;
+            }
+        }
+    });
+
+    // 5. Leitor de Câmera (QuaggaJS)
+    const cameraModal = document.getElementById('cameraModal');
+    const btnOpenCam = document.getElementById('btnOpenCam');
+    const btnCloseCam = document.getElementById('btnCloseCam');
+
+    btnOpenCam.addEventListener('click', () => {
+        cameraModal.style.display = 'flex';
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: document.querySelector('#interactive'),
+                constraints: { facingMode: "environment" }
+            },
+            decoder: { readers: ["ean_reader", "ean_8_reader", "code_128_reader"] }
+        }, function(err) {
+            if (err) {
+                alert("Erro ao abrir a câmera: " + err);
+                cameraModal.style.display = 'none';
                 return;
             }
+            Quagga.start();
+        });
+    });
 
-            // Armazena temporariamente na variável de memória
-            apiKey = campoChave;
-
-            // Transição visual de telas
-            document.getElementById("tela-login").style.display = "none";
-            document.getElementById("tela-chat").style.display = "flex";
+    Quagga.onDetected((result) => {
+        if (result && result.codeResult && result.codeResult.code) {
+            const code = result.codeResult.code;
+            eanInput.value = code;
+            buscarEAN(code);
+            fecharCamera();
         }
+    });
 
-        // Detecta o botão Enter no campo de mensagem para facilitar o envio
-        function verificarTecla(event) {
-            if (event.key === "Enter") {
-                enviarMensagem();
-            }
-        }
+    function fecharCamera() {
+        Quagga.stop();
+        cameraModal.style.display = 'none';
+    }
 
-        // Função responsável por processar e enviar a mensagem para a API do Gemini
-        async function enviarMensagem() {
-            const inputMensagem = document.getElementById("mensagem-usuario");
-            const textoMensagem = inputMensagem.value.trim();
-            const historico = document.getElementById("historico-chat");
-
-            if (textoMensagem === "") return;
-
-            // 1. Adiciona a mensagem do Usuário na tela
-            const divUsuario = document.createElement("div");
-            divUsuario.className = "mensagem usuario";
-            divUsuario.textContent = textoMensagem;
-            historico.appendChild(divUsuario);
-
-            // Limpa o campo de texto e rola para baixo
-            inputMensagem.value = "";
-            historico.scrollTop = historico.scrollHeight;
-
-            // 2. Cria o balão de resposta temporária da Fuluka (Carregando...)
-            const divFuluka = document.createElement("div");
-            divFuluka.className = "mensagem fuluka";
-            divFuluka.textContent = "Processando dados...";
-            historico.appendChild(divFuluka);
-            historico.scrollTop = historico.scrollHeight;
-
-            // 3. Conexão real com a API do Gemini utilizando a chave fornecida na senha
-            // Modelo atualizado para a versão gemini-1.5-flash
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
-            const dadosRequisicao = {
-                contents: [{
-                    parts: [{ text: textoMensagem }]
-                }]
-            };
-
-            try {
-                const resposta = await fetch(url, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(dadosRequisicao)
-                });
-
-                if (!resposta.ok) {
-                    throw new Error("Falha na comunicação com o servidor.");
-                }
-
-                const dadosRetornados = await resposta.json();
-                
-                // Extrai o texto da resposta do JSON do Gemini
-                const respostaTexto = dadosRetornados.candidates[0].content.parts[0].text;
-                
-                // Atualiza o balão da Fuluka com a resposta real
-                divFuluka.textContent = respostaTexto;
-
-            } catch (error) {
-                console.error(error);
-                divFuluka.textContent = "Erro crítico de conexão: Verifique se sua chave de acesso está correta ou se o limite foi atingido.";
-                divFuluka.style.borderColor = "#ef4444"; // Borda vermelha indicando erro
-            }
-
-            // Garante que o scroll acompanhe o final da resposta
-            historico.scrollTop = historico.scrollHeight;
-        }
-    </script>
+    btnCloseCam.addEventListener('click', fecharCamera);
+</script>
 </body>
 </html>
