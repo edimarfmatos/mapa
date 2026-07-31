@@ -142,12 +142,11 @@
             font-size: 1rem;
         }
 
-        /* Reorganização de colunas - Ajuste 6 */
-        /* Coluna 1: QR/Impressora (110px) | Coluna 2: Código/Vencimento (1.5fr) | Coluna 3: Descrição/Subgrid (1.2fr) */
         .main-grid {
             display: grid;
             grid-template-columns: 110px 1.5fr 1.2fr;
             grid-template-rows: auto auto auto;
+            height: 100%;
         }
 
         .cell {
@@ -214,7 +213,6 @@
 
         .accent-blue-bar { position: absolute; right: 0; top: 0; bottom: 0; width: 8px; background-color: #1a56c4; }
 
-        /* Ajuste do Subgrid: Quantidade reduzida e Local/Tipo reajustados */
         .sub-grid-3 {
             grid-column: 3 / 4; grid-row: 2 / 3;
             display: grid; grid-template-columns: 1.2fr 0.6fr 1fr;
@@ -234,32 +232,96 @@
         .cell-recebimento input { font-size: 1.2rem; color: #000; font-weight: bold; margin-top: 4px; }
         .accent-blue-bar-small { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; background-color: #1a56c4; }
 
-        /* Configurações para Impressão - Ajustes 4 e 5 */
+        /* ========================================================= */
+        /* AJUSTES AVANÇADOS DE IMPRESSÃO (A4 Paisagem + Margem 3cm) */
+        /* ========================================================= */
         @page {
             size: A4 landscape;
-            margin: 2cm;
+            margin: 3cm; /* Margem exata de 3cm para os 4 lados da folha */
         }
 
         @media print {
-            body { 
-                background: #fff; 
-                padding: 0; 
-                margin: 0;
+            html, body { 
+                background: #fff !important; 
+                padding: 0 !important; 
+                margin: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                overflow: hidden !important;
             }
-            .ean-bar-scanner, .top-bar, #cameraModal { display: none !important; }
+
+            .ean-bar-scanner, .top-bar, #cameraModal { 
+                display: none !important; 
+            }
+
             .app-container { 
-                border: 2px solid #000 !important; 
+                border: 2px solid #000000 !important; 
                 box-shadow: none !important; 
                 width: 100% !important; 
+                height: 100% !important; /* Força preencher toda a altura disponível da folha */
                 max-width: 100% !important; 
-                page-break-inside: avoid;
+                display: flex !important;
+                flex-direction: column !important;
+                border-radius: 0 !important;
             }
-            .cell, .sub-cell {
+
+            #formPrincipal {
+                height: 100% !important;
+                display: flex !important;
+                flex-direction: column !important;
+            }
+
+            .main-grid {
+                flex: 1 !important;
+                display: grid !important;
+                grid-template-columns: 140px 1.5fr 1.2fr !important;
+                grid-template-rows: 1fr 1.2fr 1fr !important; /* Distribui a altura proporcionalmente no papel */
+            }
+
+            .cell {
                 border: 2px solid #000000 !important;
+                padding: 12px 10px !important;
             }
+
+            .sub-cell {
+                border-right: 2px solid #000000 !important;
+                padding: 8px 6px !important;
+            }
+
+            .cell-label {
+                font-size: 0.9rem !important;
+            }
+
+            .cell-codigo input { font-size: 2.8rem !important; }
+            .cell-vencimento input { font-size: 2.8rem !important; }
+            .cell-descricao input { font-size: 1.6rem !important; }
+            .cell-bloqueio input, .cell-recebimento input { font-size: 1.8rem !important; }
+            .sub-cell select, .sub-cell input { font-size: 1.4rem !important; }
+
+            #qrcode-container {
+                width: 130px !important;
+                height: 130px !important;
+            }
+
             .accent-blue-bar, .accent-blue-bar-small {
                 background-color: #000 !important;
             }
+        }
+
+        /* Suporte para quando a impressora for alternada para o formato Retrato (Foto / Metade da Folha) */
+        @media print and (orientation: portrait) {
+            @page {
+                size: A4 portrait;
+                margin: 1.5cm;
+            }
+            .app-container {
+                height: 48vh !important; /* Ocupa exatamente a metade da folha */
+                margin-bottom: auto;
+            }
+            .cell-codigo input { font-size: 2rem !important; }
+            .cell-vencimento input { font-size: 2rem !important; }
+            .cell-descricao input { font-size: 1.2rem !important; }
+            #qrcode-container { width: 90px !important; height: 90px !important; }
         }
     </style>
 </head>
@@ -374,7 +436,6 @@
 
     let qrcodeObj = null;
 
-    // Data de Recebimento Hoje
     function setHojeRecebimento() {
         const hoje = new Date();
         const d = String(hoje.getDate()).padStart(2, '0');
@@ -384,7 +445,6 @@
     }
     setHojeRecebimento();
 
-    // Bip Sonoro Instantâneo
     function tocarBip() {
         try {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -403,7 +463,6 @@
         } catch(e) {}
     }
 
-    // Gera/Atualiza o QR Code (Ajuste 1: otimizado para leitura por câmeras de celular)
     function atualizarQRCode() {
         const eanVal = eanInput.value.trim();
         const vencVal = vencimentoInput.value.trim();
@@ -413,7 +472,6 @@
             return;
         }
 
-        // Payload limpo para fácil leitura
         const payload = JSON.stringify({
             ean: eanVal,
             cod: codigoInput.value.trim(),
@@ -426,13 +484,12 @@
         qrCodeContainer.innerHTML = "";
         qrcodeObj = new QRCode(qrCodeContainer, {
             text: payload,
-            width: 95,
-            height: 95,
+            width: 120,
+            height: 120,
             correctLevel: QRCode.CorrectLevel.M
         });
     }
 
-    // Processador de Leitura
     let debounceTimer = null;
     function processarLeitura(valor) {
         let val = valor.trim();
@@ -501,9 +558,8 @@
         }
     });
 
-    // Máscara Automática de Data de Vencimento e Cálculo de Bloqueio (Ajuste 2)
     vencimentoInput.addEventListener('input', function(e) {
-        let v = this.value.replace(/\D/g, ''); // Remove não-números
+        let v = this.value.replace(/\D/g, '');
         if (v.length > 8) v = v.substring(0, 8);
 
         if (v.length >= 5) {
@@ -514,7 +570,6 @@
             this.value = v;
         }
 
-        // Calcula Bloqueio se a data estiver completa
         if (this.value.length === 10) {
             const partes = this.value.split('/');
             let dia = parseInt(partes[0], 10);
@@ -542,7 +597,6 @@
 
     codigoInput.addEventListener('input', atualizarQRCode);
 
-    // Função de Limpar os Campos (Ajuste 3)
     function limparFormulario() {
         eanInput.value = "";
         codigoInput.value = "";
@@ -560,12 +614,10 @@
 
     document.getElementById('btnLimpar').addEventListener('click', limparFormulario);
 
-    // Impressão da folha
     document.getElementById('btnImprimir').addEventListener('click', () => {
         window.print();
     });
 
-    // Envio dos dados
     document.getElementById('formPrincipal').addEventListener('submit', function(e) {
         e.preventDefault();
         
@@ -595,7 +647,7 @@
             alert("Dados gravados com sucesso no Google Sheets!");
             btnEnviar.disabled = false;
             btnEnviar.innerText = "ENVIAR";
-            limparFormulario(); // Limpa automaticamente após envio
+            limparFormulario();
         })
         .catch(err => {
             console.error(err);
@@ -605,7 +657,6 @@
         });
     });
 
-    // Câmera
     let html5QrcodeScanner = null;
     const cameraModal = document.getElementById('cameraModal');
     const btnOpenCam = document.getElementById('btnOpenCam');
