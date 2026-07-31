@@ -192,7 +192,7 @@
         .cell-codigo input { font-size: 1.5rem; color: #000; font-weight: 800; }
 
         .cell-descricao { grid-column: 3 / 4; grid-row: 1 / 2; background-color: #fff; }
-        .cell-descricao input { font-size: 1.1rem; text-transform: uppercase; color: #000; font-weight: 800; margin-top: 4px; }
+        .cell-descricao input { font-size: 1rem; text-transform: uppercase; color: #000; font-weight: 800; margin-top: 4px; }
 
         .cell-qrcode { grid-column: 1 / 2; grid-row: 2 / 3; align-items: center; justify-content: center; padding: 4px; }
         
@@ -209,38 +209,40 @@
         }
 
         .cell-vencimento { grid-column: 2 / 3; grid-row: 2 / 3; position: relative; background-color: #fff; }
-        .cell-vencimento input { font-size: 1.6rem; font-weight: 900; color: #000; margin-top: 2px; }
+        .cell-vencimento input { font-size: 1.5rem; font-weight: 900; color: #000; margin-top: 2px; }
 
         .accent-blue-bar { position: absolute; right: 0; top: 0; bottom: 0; width: 8px; background-color: #1a56c4; }
 
+        /* Ajuste: 1fr 1fr 1fr para dividir em tamanhos rigorosamente iguais */
         .sub-grid-3 {
             grid-column: 3 / 4; grid-row: 2 / 3;
-            display: grid; grid-template-columns: 1.2fr 0.6fr 1fr;
+            display: grid; grid-template-columns: 1fr 1fr 1fr;
             border-left: 1px solid #000000; margin: -6px -8px;
         }
 
         .sub-cell { border-right: 1px solid #000000; padding: 6px 4px; display: flex; flex-direction: column; justify-content: space-between; }
         .sub-cell:last-child { border-right: none; }
-        .sub-cell select, .sub-cell input { font-size: 0.95rem; font-weight: bold; text-align: center; }
+        .sub-cell select, .sub-cell input { font-size: 0.9rem; font-weight: bold; text-align: center; width: 100%; }
         .sub-cell select { text-align: left; cursor: pointer; }
 
         .cell-alocacao { grid-column: 1 / 2; grid-row: 3 / 4; min-height: 55px; }
         .cell-bloqueio { grid-column: 2 / 3; grid-row: 3 / 4; }
-        .cell-bloqueio input { font-size: 1.1rem; color: #000; font-weight: bold; margin-top: 4px; }
+        .cell-bloqueio input { font-size: 1rem; color: #000; font-weight: bold; margin-top: 4px; }
 
         .cell-recebimento { grid-column: 3 / 4; grid-row: 3 / 4; position: relative; }
-        .cell-recebimento input { font-size: 1.1rem; color: #000; font-weight: bold; margin-top: 4px; }
+        .cell-recebimento input { font-size: 1rem; color: #000; font-weight: bold; margin-top: 4px; }
         .accent-blue-bar-small { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; background-color: #1a56c4; }
 
-        /* ========================================= */
-        /* REGRAS REVISADAS PARA IMPRESSÃO PERFEITA */
-        /* ========================================= */
+        /* =================================================== */
+        /* REGRAS DE IMPRESSÃO - PAISAGEM EXPANDIDO AO MÁXIMO   */
+        /* =================================================== */
         @page {
-            margin: 1.5cm; /* Margem ajustada para evitar cortes em qualquer impressora */
+            margin: 0.8cm;
         }
 
         @media print {
-            body { 
+            html, body {
+                height: 100% !important;
                 background: #fff !important; 
                 padding: 0 !important; 
                 margin: 0 !important;
@@ -252,32 +254,89 @@
             }
 
             .app-container { 
-                border: 2px solid #000000 !important; 
+                border: 3px solid #000000 !important; 
                 box-shadow: none !important; 
                 width: 100% !important; 
+                height: 88vh !important; 
                 max-width: 100% !important; 
                 border-radius: 0 !important;
-                page-break-inside: avoid;
+                display: flex !important;
+                flex-direction: column !important;
+            }
+
+            #formPrincipal {
+                height: 100% !important;
+                width: 100% !important;
+            }
+
+            .main-grid {
+                height: 100% !important;
+                display: grid !important;
+                grid-template-columns: 22% 43% 35% !important;
+                grid-template-rows: 1fr 1.2fr 1fr !important;
             }
 
             .cell {
-                border: 1.5px solid #000000 !important;
-                padding: 6px 8px !important;
+                border: 2px solid #000000 !important;
+                padding: 12px 15px !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
+            }
+
+            .cell-label {
+                font-size: 1.1rem !important;
+                font-weight: 900 !important;
+            }
+
+            .cell input, .sub-cell input, .sub-cell select {
+                font-size: 1.8rem !important;
+                font-weight: bold !important;
+            }
+
+            .cell-codigo input {
+                font-size: 3rem !important;
+            }
+
+            .cell-descricao input {
+                font-size: 2.2rem !important;
+            }
+
+            .cell-vencimento input {
+                font-size: 3.2rem !important;
+            }
+
+            .cell-qrcode {
+                padding: 8px !important;
+            }
+
+            #qrcode-container {
+                width: 100% !important;
+                height: 100% !important;
+                max-width: 180px !important;
+                max-height: 180px !important;
+            }
+
+            #qrcode-container img {
+                width: 100% !important;
+                height: 100% !important;
+                object-fit: contain !important;
+            }
+
+            .printer-icon {
+                width: 80px !important;
+                height: 80px !important;
+            }
+
+            .sub-grid-3 {
+                border-left: 2px solid #000000 !important;
+                margin: -12px -15px !important;
+                grid-template-columns: 1fr 1fr 1fr !important;
             }
 
             .sub-cell {
-                border-right: 1.5px solid #000000 !important;
-            }
-
-            /* Evita vazamento de texto (cortar caracteres) */
-            .cell input, .sub-cell input, .sub-cell select {
-                font-size: 1.2rem !important;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-            }
-
-            .cell-codigo input, .cell-vencimento input {
-                font-size: 1.8rem !important;
+                border-right: 2px solid #000000 !important;
+                padding: 10px 8px !important;
             }
 
             .accent-blue-bar, .accent-blue-bar-small {
@@ -445,8 +504,8 @@
         qrCodeContainer.innerHTML = "";
         qrcodeObj = new QRCode(qrCodeContainer, {
             text: payload,
-            width: 90,
-            height: 90,
+            width: 160,
+            height: 160,
             correctLevel: QRCode.CorrectLevel.M
         });
     }
