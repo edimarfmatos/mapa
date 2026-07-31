@@ -146,7 +146,6 @@
             display: grid;
             grid-template-columns: 110px 1.5fr 1.2fr;
             grid-template-rows: auto auto auto;
-            height: 100%;
         }
 
         .cell {
@@ -157,6 +156,7 @@
             flex-direction: column;
             justify-content: space-between;
             background-color: #fff;
+            overflow: hidden;
         }
 
         .cell-label {
@@ -189,7 +189,7 @@
         .cell-printer:hover .printer-icon { transform: scale(1.1); }
 
         .cell-codigo { grid-column: 2 / 3; grid-row: 1 / 2; }
-        .cell-codigo input { font-size: 1.8rem; color: #000; font-weight: 800; }
+        .cell-codigo input { font-size: 1.5rem; color: #000; font-weight: 800; }
 
         .cell-descricao { grid-column: 3 / 4; grid-row: 1 / 2; background-color: #fff; }
         .cell-descricao input { font-size: 1.1rem; text-transform: uppercase; color: #000; font-weight: 800; margin-top: 4px; }
@@ -197,8 +197,8 @@
         .cell-qrcode { grid-column: 1 / 2; grid-row: 2 / 3; align-items: center; justify-content: center; padding: 4px; }
         
         #qrcode-container {
-            width: 95px;
-            height: 95px;
+            width: 90px;
+            height: 90px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -209,7 +209,7 @@
         }
 
         .cell-vencimento { grid-column: 2 / 3; grid-row: 2 / 3; position: relative; background-color: #fff; }
-        .cell-vencimento input { font-size: 1.85rem; font-weight: 900; color: #000; margin-top: 2px; }
+        .cell-vencimento input { font-size: 1.6rem; font-weight: 900; color: #000; margin-top: 2px; }
 
         .accent-blue-bar { position: absolute; right: 0; top: 0; bottom: 0; width: 8px; background-color: #1a56c4; }
 
@@ -226,28 +226,25 @@
 
         .cell-alocacao { grid-column: 1 / 2; grid-row: 3 / 4; min-height: 55px; }
         .cell-bloqueio { grid-column: 2 / 3; grid-row: 3 / 4; }
-        .cell-bloqueio input { font-size: 1.25rem; color: #000; font-weight: bold; margin-top: 4px; }
+        .cell-bloqueio input { font-size: 1.1rem; color: #000; font-weight: bold; margin-top: 4px; }
 
         .cell-recebimento { grid-column: 3 / 4; grid-row: 3 / 4; position: relative; }
-        .cell-recebimento input { font-size: 1.2rem; color: #000; font-weight: bold; margin-top: 4px; }
+        .cell-recebimento input { font-size: 1.1rem; color: #000; font-weight: bold; margin-top: 4px; }
         .accent-blue-bar-small { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; background-color: #1a56c4; }
 
-        /* ========================================================= */
-        /* AJUSTES AVANÇADOS DE IMPRESSÃO (A4 Paisagem + Margem 3cm) */
-        /* ========================================================= */
+        /* ========================================= */
+        /* REGRAS REVISADAS PARA IMPRESSÃO PERFEITA */
+        /* ========================================= */
         @page {
-            size: A4 landscape;
-            margin: 3cm; /* Margem exata de 3cm para os 4 lados da folha */
+            margin: 1.5cm; /* Margem ajustada para evitar cortes em qualquer impressora */
         }
 
         @media print {
-            html, body { 
+            body { 
                 background: #fff !important; 
                 padding: 0 !important; 
                 margin: 0 !important;
-                width: 100vw !important;
-                height: 100vh !important;
-                overflow: hidden !important;
+                display: block !important;
             }
 
             .ean-bar-scanner, .top-bar, #cameraModal { 
@@ -258,70 +255,34 @@
                 border: 2px solid #000000 !important; 
                 box-shadow: none !important; 
                 width: 100% !important; 
-                height: 100% !important; /* Força preencher toda a altura disponível da folha */
                 max-width: 100% !important; 
-                display: flex !important;
-                flex-direction: column !important;
                 border-radius: 0 !important;
-            }
-
-            #formPrincipal {
-                height: 100% !important;
-                display: flex !important;
-                flex-direction: column !important;
-            }
-
-            .main-grid {
-                flex: 1 !important;
-                display: grid !important;
-                grid-template-columns: 140px 1.5fr 1.2fr !important;
-                grid-template-rows: 1fr 1.2fr 1fr !important; /* Distribui a altura proporcionalmente no papel */
+                page-break-inside: avoid;
             }
 
             .cell {
-                border: 2px solid #000000 !important;
-                padding: 12px 10px !important;
+                border: 1.5px solid #000000 !important;
+                padding: 6px 8px !important;
             }
 
             .sub-cell {
-                border-right: 2px solid #000000 !important;
-                padding: 8px 6px !important;
+                border-right: 1.5px solid #000000 !important;
             }
 
-            .cell-label {
-                font-size: 0.9rem !important;
+            /* Evita vazamento de texto (cortar caracteres) */
+            .cell input, .sub-cell input, .sub-cell select {
+                font-size: 1.2rem !important;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
 
-            .cell-codigo input { font-size: 2.8rem !important; }
-            .cell-vencimento input { font-size: 2.8rem !important; }
-            .cell-descricao input { font-size: 1.6rem !important; }
-            .cell-bloqueio input, .cell-recebimento input { font-size: 1.8rem !important; }
-            .sub-cell select, .sub-cell input { font-size: 1.4rem !important; }
-
-            #qrcode-container {
-                width: 130px !important;
-                height: 130px !important;
+            .cell-codigo input, .cell-vencimento input {
+                font-size: 1.8rem !important;
             }
 
             .accent-blue-bar, .accent-blue-bar-small {
                 background-color: #000 !important;
             }
-        }
-
-        /* Suporte para quando a impressora for alternada para o formato Retrato (Foto / Metade da Folha) */
-        @media print and (orientation: portrait) {
-            @page {
-                size: A4 portrait;
-                margin: 1.5cm;
-            }
-            .app-container {
-                height: 48vh !important; /* Ocupa exatamente a metade da folha */
-                margin-bottom: auto;
-            }
-            .cell-codigo input { font-size: 2rem !important; }
-            .cell-vencimento input { font-size: 2rem !important; }
-            .cell-descricao input { font-size: 1.2rem !important; }
-            #qrcode-container { width: 90px !important; height: 90px !important; }
         }
     </style>
 </head>
@@ -413,7 +374,7 @@
     </form>
 </div>
 
-<!-- Modal para uso da Câmera -->
+<!-- Modal da Câmera -->
 <div id="cameraModal">
     <div id="reader"></div>
     <button class="btn-close-cam" id="btnCloseCam">Fechar Câmera</button>
@@ -484,8 +445,8 @@
         qrCodeContainer.innerHTML = "";
         qrcodeObj = new QRCode(qrCodeContainer, {
             text: payload,
-            width: 120,
-            height: 120,
+            width: 90,
+            height: 90,
             correctLevel: QRCode.CorrectLevel.M
         });
     }
